@@ -4,12 +4,21 @@
  */
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "agents-starter",
+	"name": "CloudInterview",
 	"main": "src/index.ts",
 	"compatibility_date": "2025-11-26",
 	"observability": {
 		"enabled": true
-	}
+	},
+	"kv_namespaces": [
+    {
+      "binding": "KV",
+      "id": "db52a540b5fd4eb3861e5d33c640e45d",
+      
+      // Optional: preview_id used when running `wrangler dev` for local dev
+    //   "preview_id": "<ID_OF_PREVIEW_KV_NAMESPACE_FOR_LOCAL_DEVELOPMENT>"
+    }
+  ]
 	/**
 	 * Smart Placement
 	 * Docs: https://developers.cloudflare.com/workers/configuration/smart-placement/#smart-placement
