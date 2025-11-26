@@ -1,0 +1,51 @@
+@startuml
+package "Domain" {
+    class InterviewSession
+    class InterviewQuestion
+    class InterviewAnswer
+    class InterviewFeedback
+    class CodingChallenge
+    class User
+}
+
+package "Application" {
+    class InterviewService
+    class UserService
+}
+
+package "Agent/LLM" {
+    class AIInterviewerAgent
+    class LLMClient
+}
+
+package "Persistence" {
+    class SessionRepository
+    class QuestionBank
+}
+
+package "API" {
+    class InterviewController
+}
+
+' Relationships
+InterviewService --> InterviewSession
+InterviewService --> InterviewQuestion
+InterviewService --> InterviewFeedback
+InterviewService --> SessionRepository
+InterviewService --> AIInterviewerAgent
+
+AIInterviewerAgent --> LLMClient
+
+InterviewController --> InterviewService
+InterviewController --> UserService
+
+SessionRepository --> InterviewSession
+QuestionBank --> InterviewQuestion
+UserService --> User
+
+InterviewSession "1" o-- "*" InterviewQuestion
+InterviewSession "1" o-- "*" InterviewAnswer
+InterviewSession "1" o-- "1" InterviewFeedback
+InterviewSession "1" o-- "*" CodingChallenge
+User "1" o-- "*" InterviewSession
+@enduml

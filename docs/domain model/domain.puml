@@ -1,0 +1,106 @@
+@startuml
+' Domain Model for CloudInterview (Online AI Interviewer)
+
+' === ENUMS ===
+enum InterviewMode {
+  Technical
+  Behavioral
+}
+
+
+enum InterviewStatus {
+  Pending
+  InProgress
+  Completed
+}
+
+enum QuestionType {
+  Coding
+  Theory
+  Behavioral
+}
+
+enum Difficulty {
+  Easy
+  Medium
+  Hard
+}
+
+' === VALUE OBJECTS ===
+class InterviewQuestion {
+  +questionId: String
+  +type: QuestionType
+  +text: String
+  +difficulty: Difficulty
+  +tags: List<String>
+  +context: Any
+}
+
+class InterviewAnswer {
+  +questionId: String
+  +answerText: String
+  +submittedAt: Date
+  +reviewNotes: String
+}
+
+class CodingChallenge {
+  +challengeId: String
+  +description: String
+  +difficulty: Difficulty
+  +tags: List<String>
+  +exampleSolution: String
+}
+
+class InterviewFeedback {
+  +sessionId: String
+  +summary: String
+  +score: Integer
+  +starBreakdown: Map<String, String>
+  +recommendation: String
+}
+
+' === AGGREGATE ROOTS / ENTITIES ===
+class InterviewSession {
+  +sessionId: String
+  +userId: String
+  +mode: InterviewMode
+  +jobType: String
+  +status: InterviewStatus
+  +createdAt: Date
+  +completedAt: Date
+  +questions: List<InterviewQuestion>
+  +answers: List<InterviewAnswer>
+  +feedback: InterviewFeedback
+  --
+  +startInterview()
+  +nextQuestion(): InterviewQuestion
+  +submitAnswer(questionId: String, answerText: String)
+  +generateFeedback(): InterviewFeedback
+  +completeSession()
+  +getTranscript(): String
+}
+
+class User {
+  +userId: String
+  +name: String
+  +email: String
+  +profile: String
+  +sessions: List<InterviewSession>
+  --
+  +getSessionHistory(): List<InterviewSession>
+  +deleteSession(sessionId: String)
+}
+
+' === RELATIONSHIPS ===
+InterviewSession "1" o-- "*" InterviewQuestion : contains >
+InterviewSession "1" o-- "*" InterviewAnswer : contains >
+InterviewSession "1" o-- "1" InterviewFeedback : produces >
+InterviewSession "1" o-- "*" CodingChallenge : includes >
+User "1" o-- "*" InterviewSession : owns >
+InterviewSession ..> InterviewMode
+InterviewSession ..> InterviewStatus
+InterviewQuestion ..> QuestionType
+InterviewQuestion ..> Difficulty
+CodingChallenge ..> Difficulty
+
+@enduml
