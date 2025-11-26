@@ -1,62 +1,192 @@
-@startuml
-' Domain Model for CloudInterview (Online AI Interviewer)
+@startuml CloudInterview-DomainModel
+' Comprehensive Domain Model for CloudInterview (AI Interviewer Platform)
 
 ' === ENUMS ===
 enum InterviewMode {
   Technical
   Behavioral
+  Mixed
 }
-
 
 enum InterviewStatus {
   Pending
   InProgress
   Completed
+  Cancelled
+  Timeout
 }
 
 enum QuestionType {
   Coding
   Theory
   Behavioral
+  Scenario
+  SystemDesign
+  ProductDesign
 }
 
 enum Difficulty {
   Easy
   Medium
   Hard
+  Expert
+}
+
+enum ProgrammingLanguage {
+  Python
+  JavaScript
+  TypeScript
+  Java
+  Cpp
+  CSharp
+  Go
+  Rust
+}
+
+enum ExperienceLevel {
+  Junior
+  Mid
+  Senior
+  Lead
+  Principal
+}
+
+enum ProficiencyLevel {
+  Beginner
+  Intermediate
+  Advanced
+  Expert
+}
+
+enum FeedbackStyle {
+  Detailed
+  Concise
+  Actionable
 }
 
 ' === VALUE OBJECTS ===
 class InterviewQuestion {
   +questionId: String
   +type: QuestionType
-  +text: String
+  +category: String
   +difficulty: Difficulty
+  +title: String
+  +text: String
   +tags: List<String>
-  +context: Any
+  +estimatedTime: Integer
+  +followUpQuestions: List<String>
+  +hints: List<String>
+  +metadata: QuestionMetadata
 }
 
 class InterviewAnswer {
+  +answerId: String
+  +sessionId: String
   +questionId: String
   +answerText: String
   +submittedAt: Date
-  +reviewNotes: String
+  +responseTime: Integer
+  +codeSubmission: CodeSubmission
+  +approachExplanation: String
+  +starFormat: STARResponse
+  +completenessScore: Integer
+  +relevanceScore: Integer
+  +communicationScore: Integer
 }
 
 class CodingChallenge {
   +challengeId: String
+  +title: String
   +description: String
   +difficulty: Difficulty
-  +tags: List<String>
-  +exampleSolution: String
+  +category: String
+  +topics: List<String>
+  +timeLimit: Integer
+  +testCases: List<TestCase>
+  +starterCode: Map<String, String>
+  +optimalSolution: Map<String, String>
+  +complexityAnalysis: ComplexityAnalysis
+  +relatedChallenges: List<String>
+  +difficultyWeight: Double
 }
 
 class InterviewFeedback {
+  +feedbackId: String
   +sessionId: String
+  +overallScore: Integer
   +summary: String
+  +technicalSkills: SkillAssessment
+  +communication: SkillAssessment
+  +problemSolving: SkillAssessment
+  +domainKnowledge: SkillAssessment
+  +behavioralCompetencies: BehavioralAssessment
+  +strengths: List<String>
+  +improvementAreas: List<String>
+  +specificRecommendations: List<String>
+  +percentileRank: Double
+  +benchmarkComparison: BenchmarkComparison
+  +generatedAt: Date
+}
+
+class UserProfile {
+  +jobTitles: List<String>
+  +experienceLevel: ExperienceLevel
+  +primaryLanguages: List<String>
+  +industries: List<String>
+  +resumeSummary: String
+  +areasOfInterest: List<String>
+}
+
+class UserPreferences {
+  +defaultMode: InterviewMode
+  +defaultDifficulty: Difficulty
+  +languagePreferences: List<ProgrammingLanguage>
+  +feedbackStyle: FeedbackStyle
+  +voiceInputEnabled: Boolean
+  +darkMode: Boolean
+  +notifications: NotificationPreferences
+}
+
+class STARResponse {
+  +situation: String
+  +task: String
+  +action: String
+  +result: String
+  +reflection: String
+}
+
+class CodeSubmission {
+  +submissionId: String
+  +challengeId: String
+  +language: ProgrammingLanguage
+  +code: String
+  +submittedAt: Date
+  +executionResult: ExecutionResult
+  +compilationErrors: List<String>
+  +styleIssues: List<CodeStyleIssue>
+  +complexityAnalysis: String
+}
+
+class SkillAssessment {
+  +skill: String
   +score: Integer
-  +starBreakdown: Map<String, String>
-  +recommendation: String
+  +level: ProficiencyLevel
+  +confidence: Double
+  +evidence: List<String>
+  +growthTrajectory: GrowthTrajectory
+}
+
+class AIResponse {
+  +responseId: String
+  +sessionId: String
+  +questionId: String
+  +type: AIResponseType
+  +content: String
+  +generatedAt: Date
+  +sentiment: Sentiment
+  +followUp: Boolean
+  +responseTime: Integer
+  +confidence: Double
 }
 
 ' === AGGREGATE ROOTS / ENTITIES ===
@@ -65,12 +195,15 @@ class InterviewSession {
   +userId: String
   +mode: InterviewMode
   +jobType: String
+  +difficulty: Difficulty
   +status: InterviewStatus
   +createdAt: Date
+  +startedAt: Date
   +completedAt: Date
-  +questions: List<InterviewQuestion>
-  +answers: List<InterviewAnswer>
-  +feedback: InterviewFeedback
+  +duration: Integer
+  +currentQuestionIndex: Integer
+  +codingChallenge: CodingChallenge
+  +scenarioContext: ScenarioContext
   --
   +startInterview()
   +nextQuestion(): InterviewQuestion
@@ -82,25 +215,98 @@ class InterviewSession {
 
 class User {
   +userId: String
-  +name: String
   +email: String
-  +profile: String
-  +sessions: List<InterviewSession>
+  +name: String
+  +profile: UserProfile
+  +createdAt: Date
+  +lastActive: Date
+  +preferences: UserPreferences
   --
   +getSessionHistory(): List<InterviewSession>
   +deleteSession(sessionId: String)
+  +updateProfile(profile: UserProfile)
+  +getProgressReport(): ProgressReport
+}
+
+' === DOMAIN SERVICES ===
+class InterviewOrchestrationService {
+  +startSession(user: User, mode: InterviewMode, jobType: String): InterviewSession
+  +presentNextQuestion(session: InterviewSession): InterviewQuestion
+  +evaluateAnswer(session: InterviewSession, answer: InterviewAnswer): AIResponse
+  +generateFeedback(session: InterviewSession): InterviewFeedback
+  +completeSession(session: InterviewSession)
+}
+
+class QuestionSelectionService {
+  +selectQuestions(user: User, mode: InterviewMode, difficulty: Difficulty, count: Integer): List<InterviewQuestion>
+  +adaptDifficulty(session: InterviewSession, performance: PerformanceMetrics): Difficulty
+  +getFollowUpQuestions(question: InterviewQuestion, answer: InterviewAnswer): List<InterviewQuestion>
+}
+
+class FeedbackGenerationService {
+  +analyzeTechnicalPerformance(session: InterviewSession): TechnicalAssessment
+  +analyzeBehavioralResponse(answer: InterviewAnswer): BehavioralAnalysis
+  +generateOverallFeedback(session: InterviewSession): InterviewFeedback
+  +createRecommendations(session: InterviewSession): LearningRecommendations
+}
+
+' === REPOSITORIES ===
+class InterviewSessionRepository {
+  +save(session: InterviewSession)
+  +findById(sessionId: String): InterviewSession
+  +findByUser(userId: String, limit: Integer): List<InterviewSession>
+  +delete(sessionId: String)
+}
+
+class QuestionRepository {
+  +findById(questionId: String): InterviewQuestion
+  +findByCriteria(criteria: QuestionSearchCriteria): List<InterviewQuestion>
+  +save(question: InterviewQuestion)
+  +update(question: InterviewQuestion)
+  +delete(questionId: String)
+}
+
+class UserRepository {
+  +save(user: User)
+  +findById(userId: String): User
+  +findByEmail(email: String): User
+  +delete(userId: String)
 }
 
 ' === RELATIONSHIPS ===
+' Core relationships
 InterviewSession "1" o-- "*" InterviewQuestion : contains >
 InterviewSession "1" o-- "*" InterviewAnswer : contains >
+InterviewSession "1" o-- "*" AIResponse : contains >
 InterviewSession "1" o-- "1" InterviewFeedback : produces >
-InterviewSession "1" o-- "*" CodingChallenge : includes >
+InterviewSession "1" o-- "*" CodeSubmission : includes >
+InterviewSession "1" o-- "1" CodingChallenge : includes >
 User "1" o-- "*" InterviewSession : owns >
+User "1" o-- "1" UserProfile : has >
+User "1" o-- "1" UserPreferences : has >
+
+' Service relationships
+InterviewOrchestrationService --> InterviewSession
+InterviewOrchestrationService --> InterviewQuestion
+InterviewOrchestrationService --> InterviewFeedback
+InterviewOrchestrationService --> InterviewSessionRepository
+InterviewOrchestrationService --> QuestionSelectionService
+InterviewOrchestrationService --> FeedbackGenerationService
+
+QuestionSelectionService --> QuestionRepository
+FeedbackGenerationService --> InterviewSessionRepository
+UserRepository --> User
+
+' Enum relationships
 InterviewSession ..> InterviewMode
 InterviewSession ..> InterviewStatus
 InterviewQuestion ..> QuestionType
 InterviewQuestion ..> Difficulty
 CodingChallenge ..> Difficulty
+InterviewAnswer ..> ProgrammingLanguage
+UserPreferences ..> InterviewMode
+UserPreferences ..> Difficulty
+User ..> ExperienceLevel
+SkillAssessment ..> ProficiencyLevel
 
 @enduml

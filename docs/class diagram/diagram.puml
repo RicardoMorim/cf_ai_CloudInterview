@@ -1,51 +1,113 @@
-@startuml
-package "Domain" {
+@startuml CloudInterview-Architecture
+package "Domain Layer" {
     class InterviewSession
     class InterviewQuestion
     class InterviewAnswer
     class InterviewFeedback
     class CodingChallenge
     class User
+    class UserProfile
+    class UserPreferences
+    class STARResponse
+    class CodeSubmission
+    class SkillAssessment
+    class AIResponse
 }
 
-package "Application" {
-    class InterviewService
-    class UserService
+package "Application Layer" {
+    class InterviewManagementService
+    class UserExperienceService
+    class QuestionSelectionService
+    class FeedbackGenerationService
+    class InterviewOrchestrationService
 }
 
-package "Agent/LLM" {
+package "Infrastructure Layer" {
+    class InterviewSessionRepository
+    class QuestionRepository
+    class UserRepository
+    class KVService
+    class DurableObjectService
+    class AIIntegrationService
+    class SpeechRecognitionService
+}
+
+package "Presentation Layer" {
+    class InterviewController
+    class UserController
+    class QuestionBankController
+    class FeedbackController
+    class WebSocketController
+}
+
+package "AI/Agents Layer" {
     class AIInterviewerAgent
     class LLMClient
+    class PromptManager
+    class ResponseEvaluator
 }
 
-package "Persistence" {
-    class SessionRepository
-    class QuestionBank
+package "External Services" {
+    class WorkersAI
+    class CloudflareKV
+    class CloudflareDurableObjects
+    class WebSpeechAPI
+    class CodeExecutionService
 }
 
-package "API" {
-    class InterviewController
-}
-
-' Relationships
-InterviewService --> InterviewSession
-InterviewService --> InterviewQuestion
-InterviewService --> InterviewFeedback
-InterviewService --> SessionRepository
-InterviewService --> AIInterviewerAgent
-
-AIInterviewerAgent --> LLMClient
-
-InterviewController --> InterviewService
-InterviewController --> UserService
-
-SessionRepository --> InterviewSession
-QuestionBank --> InterviewQuestion
-UserService --> User
-
+' Domain relationships
 InterviewSession "1" o-- "*" InterviewQuestion
 InterviewSession "1" o-- "*" InterviewAnswer
+InterviewSession "1" o-- "*" AIResponse
 InterviewSession "1" o-- "1" InterviewFeedback
-InterviewSession "1" o-- "*" CodingChallenge
+InterviewSession "1" o-- "*" CodeSubmission
+InterviewSession "1" o-- "1" CodingChallenge
 User "1" o-- "*" InterviewSession
+User "1" o-- "1" UserProfile
+User "1" o-- "1" UserPreferences
+
+' Application service relationships
+InterviewManagementService --> InterviewSession
+InterviewManagementService --> InterviewOrchestrationService
+InterviewManagementService --> InterviewSessionRepository
+
+UserExperienceService --> User
+UserExperienceService --> UserRepository
+UserExperienceService --> InterviewManagementService
+
+QuestionSelectionService --> QuestionRepository
+FeedbackGenerationService --> InterviewSessionRepository
+InterviewOrchestrationService --> QuestionSelectionService
+InterviewOrchestrationService --> FeedbackGenerationService
+
+' Infrastructure relationships
+InterviewSessionRepository --> InterviewSession
+QuestionRepository --> InterviewQuestion
+UserRepository --> User
+KVService --> QuestionBank
+DurableObjectService --> InterviewSession
+AIIntegrationService --> AIInterviewerAgent
+SpeechRecognitionService --> InterviewController
+
+' API Controller relationships
+InterviewController --> InterviewManagementService
+UserController --> UserExperienceService
+QuestionBankController --> QuestionSelectionService
+FeedbackController --> FeedbackGenerationService
+WebSocketController --> InterviewOrchestrationService
+
+' AI Agent relationships
+AIInterviewerAgent --> LLMClient
+AIInterviewerAgent --> PromptManager
+AIInterviewerAgent --> ResponseEvaluator
+LLMClient --> WorkersAI
+PromptManager --> InterviewQuestion
+ResponseEvaluator --> InterviewAnswer
+
+' External service relationships
+KVService --> CloudflareKV
+DurableObjectService --> CloudflareDurableObjects
+SpeechRecognitionService --> WebSpeechAPI
+CodeExecutionService --> InterviewQuestion
+
 @enduml
