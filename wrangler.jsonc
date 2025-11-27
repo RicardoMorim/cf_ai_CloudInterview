@@ -4,7 +4,7 @@
  */
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "CloudInterview",
+	"name": "cloudinterview",
 	"main": "src/index.ts",
 	"compatibility_date": "2025-11-26",
 	"observability": {
@@ -17,6 +17,25 @@
       
       // Optional: preview_id used when running `wrangler dev` for local dev
     //   "preview_id": "<ID_OF_PREVIEW_KV_NAMESPACE_FOR_LOCAL_DEVELOPMENT>"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "SESSION_NAMESPACE",
+        "class_name": "InterviewSessionDO"
+      }
+    ]
+  },
+  "ai": {
+    "binding": "AI"
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_classes": [
+        "InterviewSessionDO"
+      ]
     }
   ]
 	/**
