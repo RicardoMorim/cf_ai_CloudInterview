@@ -8,6 +8,7 @@ import CodeIcon from '../assets/icons/code.svg';
 import BrainIcon from '../assets/icons/brain.svg';
 import ClockIcon from '../assets/icons/clock.svg';
 import './InterviewPage.css';
+import { Link } from 'react-router-dom';
 
 const InterviewPage = () => {
   const { 
