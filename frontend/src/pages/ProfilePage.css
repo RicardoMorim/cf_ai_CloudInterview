@@ -1,0 +1,35 @@
+/* ProfilePage.css */
+
+.profile-page {
+  padding: 2rem 0;
+}
+
+.profile-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 0 2rem;
+}
+
+.page-header {
+  text-align: center;
+  margin-bottom: 3rem;
+}
+
+.page-header h1 {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+}
+
+.page-header p {
+  font-size: 1.25rem;
+  color: var(--text-secondary);
+}
+
+.profile-content {
+  text-align: center;
+  padding: 4rem 0;
+  color: var(--text-secondary);
+  font-size: 1.125rem;
+}
