@@ -95,7 +95,7 @@ export class SessionCreate extends OpenAPIRoute {
 			const sessionManager = new SessionManager(SESSION_NAMESPACE);
 
 			console.log("SessionCreate: Calling createSession");
-			const sessionId = await sessionManager.createSession(
+			const { sessionId } = await sessionManager.createSession(
 				userId,
 				mode as any,
 				jobType,

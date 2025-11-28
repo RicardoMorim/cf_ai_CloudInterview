@@ -72,15 +72,32 @@ export class InterviewSessionDO {
     }
 
     const now = new Date().toISOString();
-
-    // Select questions based on mode
     let selectedQuestions: InterviewQuestion[] = [];
 
     if (mode === InterviewMode.TECHNICAL) {
       try {
         // 1. Fetch essentials list from KV
-        const essentialsData = await this.state.storage.get<any>("essentials") || // Try local storage first (caching)
+        let essentialsData = await this.state.storage.get<any>("essentials") ||
           await this.env.KV.get("essentials", { type: "json" });
+
+        // Fallback to local data if KV is empty
+        if (!essentialsData || !essentialsData.problems) {
+          console.log("DO: KV essentials missing, using local fallback");
+          const { TECHNICAL_QUESTIONS } = await import("../data/questions");
+          essentialsData = {
+            problems: TECHNICAL_QUESTIONS.map(q => ({
+              id: q.questionId,
+              title: q.title,
+              difficulty: q.difficulty,
+              topics: q.tags
+            }))
+          };
+
+          // Also populate the full problem details in the fallback path
+          for (const q of TECHNICAL_QUESTIONS) {
+            await this.state.storage.put(`problem:${q.questionId}`, q);
+          }
+        }
 
         if (essentialsData && essentialsData.problems) {
           // 2. Filter problems
@@ -92,7 +109,7 @@ export class InterviewSessionDO {
           const limitedPool = pool.slice(0, 50);
 
           // 3. Ask AI to select a question
-          let selectedId = 0;
+          let selectedId = "0";
           try {
             const prompt = `
 You are an expert technical interviewer. 
@@ -102,7 +119,7 @@ Task: Select the most suitable coding problem from the list below for this inter
 Rules:
 - Return ONLY the ID of the selected problem.
 - If no problem is suitable or you prefer to ask theoretical questions generated on the fly, return 0.
-- Do not add any explanation or text, just the number.
+- Do not add any explanation or text, just the ID.
 
 Problems:
 ${limitedPool.map((p: any) => `${p.id}: ${p.title} (${p.topics.join(', ')})`).join('\n')}
@@ -111,9 +128,18 @@ ${limitedPool.map((p: any) => `${p.id}: ${p.title} (${p.topics.join(', ')})`).jo
               messages: [{ role: "user", content: prompt }]
             });
 
-            const responseText = response.response.trim();
-            const parsedId = parseInt(responseText.match(/\d+/)?.[0] || "0");
-            selectedId = isNaN(parsedId) ? 0 : parsedId;
+            console.log("DO: AI Response:", JSON.stringify(response));
+
+            let responseText = "0";
+            if (response && typeof response.response === 'string') {
+              responseText = response.response.trim();
+            } else if (response && typeof response === 'string') {
+              responseText = response.trim();
+            } else if (response && response.result && typeof response.result.response === 'string') {
+              responseText = response.result.response.trim();
+            }
+
+            selectedId = responseText.replace(/['"]/g, '').trim();
             console.log(`DO: AI selected question ID: ${selectedId}`);
 
           } catch (aiError) {
@@ -123,37 +149,55 @@ ${limitedPool.map((p: any) => `${p.id}: ${p.title} (${p.topics.join(', ')})`).jo
             }
           }
 
-          if (selectedId > 0) {
+          if (selectedId !== "0") {
             // 4. Fetch full details
-            const fullProblem = await this.env.KV.get(`problem:${selectedId}`, { type: "json" }) as any;
+            let fullProblem = await this.state.storage.get(`problem:${selectedId}`) as any;
+
+            if (!fullProblem) {
+              fullProblem = await this.env.KV.get(`problem:${selectedId}`, { type: "json" }) as any;
+            }
+
+            if (!fullProblem) {
+              const { TECHNICAL_QUESTIONS } = await import("../data/questions");
+              fullProblem = TECHNICAL_QUESTIONS.find(q => q.questionId === selectedId);
+            }
 
             if (fullProblem) {
-              selectedQuestions.push({
-                questionId: fullProblem.id.toString(),
-                type: QuestionType.CODING,
-                category: fullProblem.metadata?.category || "General",
-                difficulty: fullProblem.difficulty as Difficulty,
-                title: fullProblem.title,
-                text: fullProblem.description,
-                tags: fullProblem.metadata?.topics || [],
-                estimatedTime: 20,
-                followUpQuestions: [],
-                hints: fullProblem.metadata?.hints || [],
-                metadata: {
-                  difficultyWeight: 1,
-                  popularity: fullProblem.metadata?.likes || 0,
-                  lastUpdated: new Date().toISOString(),
-                  relatedQuestions: []
-                }
-              });
+              const isAlreadyFormatted = fullProblem.questionId && fullProblem.text;
+
+              if (isAlreadyFormatted) {
+                selectedQuestions.push(fullProblem);
+              } else {
+                selectedQuestions.push({
+                  questionId: fullProblem.id.toString(),
+                  type: QuestionType.CODING,
+                  category: fullProblem.metadata?.category || "General",
+                  difficulty: fullProblem.difficulty as Difficulty,
+                  title: fullProblem.title,
+                  text: fullProblem.description,
+                  tags: fullProblem.metadata?.topics || [],
+                  estimatedTime: 20,
+                  followUpQuestions: [],
+                  hints: fullProblem.metadata?.hints || [],
+                  metadata: {
+                    difficultyWeight: 1,
+                    popularity: fullProblem.metadata?.likes || 0,
+                    lastUpdated: new Date().toISOString(),
+                    relatedQuestions: []
+                  }
+                });
+              }
             }
           }
         }
       } catch (error) {
-        console.error("DO: Error fetching questions from KV:", error);
+        console.error("DO: Error fetching questions:", error);
       }
     } else if (mode === InterviewMode.BEHAVIORAL) {
-      // Behavioral questions generated on the fly
+      const { BEHAVIORAL_SCENARIOS } = await import("../data/questions");
+      if (BEHAVIORAL_SCENARIOS.length > 0) {
+        selectedQuestions.push(BEHAVIORAL_SCENARIOS[0]);
+      }
     }
 
     this.session = {
@@ -214,9 +258,13 @@ ${limitedPool.map((p: any) => `${p.id}: ${p.title} (${p.topics.join(', ')})`).jo
       throw new Error("No session found");
     }
 
+    console.log(this.session.questions.length + " questions");
+    console.log(this.session.currentQuestionIndex + " current question index");
     if (this.session.currentQuestionIndex >= this.session.questions.length) {
       return null;
     }
+
+    console.log(this.session.questions[this.session.currentQuestionIndex]);
 
     return this.session.questions[this.session.currentQuestionIndex];
   }
@@ -424,42 +472,39 @@ ${limitedPool.map((p: any) => `${p.id}: ${p.title} (${p.topics.join(', ')})`).jo
           const { userId, mode, jobType, difficulty, estimatedDuration, sessionId } = await request.json() as any;
           await this.startSession(userId, mode, jobType, difficulty, estimatedDuration);
           if (sessionId) {
-             this.session!.sessionId = sessionId;
-             await this.saveSession();
+            this.session!.sessionId = sessionId;
+            await this.saveSession();
           }
           return new Response(JSON.stringify({ success: true, session: this.session }), {
             headers: { "Content-Type": "application/json" }
           });
 
         case "/begin":
-           if (request.method !== "POST") {
-             return new Response("Method Not Allowed", { status: 405 });
-           }
-           const firstQuestion = await this.getCurrentQuestion();
-           return new Response(JSON.stringify({ success: true, question: firstQuestion, session: this.session }), {
-             headers: { "Content-Type": "application/json" }
-           });
+          if (request.method !== "POST") {
+            return new Response("Method Not Allowed", { status: 405 });
+          }
+          const firstQuestion = await this.getCurrentQuestion();
+          return new Response(JSON.stringify({ success: true, question: firstQuestion, session: this.session }), {
+            headers: { "Content-Type": "application/json" }
+          });
 
         case "/answer":
           if (request.method !== "POST") {
             return new Response("Method Not Allowed", { status: 405 });
           }
-          const answer = await request.json() as any;
+          const answer = await request.json() as InterviewAnswer;
           const result = await this.submitAnswer(answer);
           return new Response(JSON.stringify({ success: true, ...result }), {
             headers: { "Content-Type": "application/json" }
           });
 
         case "/next":
-           if (request.method !== "POST") {
-             return new Response("Method Not Allowed", { status: 405 });
-           }
-           const nextResult = await this.nextQuestion();
-           return new Response(JSON.stringify({ success: true, ...nextResult }), {
-             headers: { "Content-Type": "application/json" }
-           });
+          const nextResult = await this.nextQuestion();
+          return new Response(JSON.stringify({ success: true, ...nextResult }), {
+            headers: { "Content-Type": "application/json" }
+          });
 
-        case "/complete":
+        case "/end":
           if (request.method !== "POST") {
             return new Response("Method Not Allowed", { status: 405 });
           }
@@ -468,70 +513,55 @@ ${limitedPool.map((p: any) => `${p.id}: ${p.title} (${p.topics.join(', ')})`).jo
             headers: { "Content-Type": "application/json" }
           });
 
-        case "/transcript":
-           const transcriptData = await this.getTranscript();
-           return new Response(JSON.stringify({ success: true, ...transcriptData }), {
-             headers: { "Content-Type": "application/json" }
-           });
-           
-        case "/summary":
-           const summaryData = await this.getTranscript();
-           return new Response(JSON.stringify(summaryData), {
-             headers: { "Content-Type": "application/json" }
-           });
-
         case "/state":
-           if (!this.session) {
-             return new Response(JSON.stringify({ success: false, error: "No session found" }), { status: 404, headers: { "Content-Type": "application/json" } });
-           }
-           return new Response(JSON.stringify({ success: true, session: this.session }), {
-             headers: { "Content-Type": "application/json" }
-           });
+          return new Response(JSON.stringify({ success: true, session: this.session }), {
+            headers: { "Content-Type": "application/json" }
+          });
 
         case "/update-state":
-           if (request.method !== "POST") {
-             return new Response("Method Not Allowed", { status: 405 });
-           }
-           const { session: updatedSession } = await request.json() as any;
-           if (updatedSession) {
-             this.session = updatedSession;
-             await this.saveSession();
-           }
-           return new Response(JSON.stringify({ success: true, session: this.session }), {
-             headers: { "Content-Type": "application/json" }
-           });
+          if (request.method !== "POST") {
+            return new Response("Method Not Allowed", { status: 405 });
+          }
+          const updates = await request.json() as any;
+          if (this.session) {
+            this.session = { ...this.session, ...updates };
+            await this.saveSession();
+          }
+          return new Response(JSON.stringify({ success: true, session: this.session }), {
+            headers: { "Content-Type": "application/json" }
+          });
 
         case "/question/current":
-           const currentQ = await this.getCurrentQuestion();
-           return new Response(JSON.stringify({ success: true, question: currentQ, session: this.session }), {
-             headers: { "Content-Type": "application/json" }
-           });
+          const currentQ = await this.getCurrentQuestion();
+          return new Response(JSON.stringify({ success: true, question: currentQ, session: this.session }), {
+            headers: { "Content-Type": "application/json" }
+          });
 
         case "/add-interaction":
-           if (request.method !== "POST") {
-             return new Response("Method Not Allowed", { status: 405 });
-           }
-           const { userText, aiText } = await request.json() as any;
-           
-           // Store AI response
-           if (aiText && this.session) {
-             this.session.aiResponses.push({
-               responseId: crypto.randomUUID(),
-               sessionId: this.session.sessionId,
-               type: AIResponseType.ENCOURAGEMENT, // Defaulting to encouragement/chat
-               content: aiText,
-               generatedAt: new Date().toISOString(),
-               sentiment: Sentiment.NEUTRAL,
-               followUp: false,
-               responseTime: 0,
-               confidence: 1
-             });
-             await this.saveSession();
-           }
-           
-           return new Response(JSON.stringify({ success: true }), {
-             headers: { "Content-Type": "application/json" }
-           });
+          if (request.method !== "POST") {
+            return new Response("Method Not Allowed", { status: 405 });
+          }
+          const { userText, aiText } = await request.json() as any;
+
+          // Store AI response
+          if (aiText && this.session) {
+            this.session.aiResponses.push({
+              responseId: crypto.randomUUID(),
+              sessionId: this.session.sessionId,
+              type: AIResponseType.ENCOURAGEMENT, // Defaulting to encouragement/chat
+              content: aiText,
+              generatedAt: new Date().toISOString(),
+              sentiment: Sentiment.NEUTRAL,
+              followUp: false,
+              responseTime: 0,
+              confidence: 1
+            });
+            await this.saveSession();
+          }
+
+          return new Response(JSON.stringify({ success: true }), {
+            headers: { "Content-Type": "application/json" }
+          });
 
         default:
           return new Response("Not Found", { status: 404 });
@@ -553,64 +583,31 @@ ${limitedPool.map((p: any) => `${p.id}: ${p.title} (${p.topics.join(', ')})`).jo
 }
 
 export class SessionManager {
-  private sessionNamespace: DurableObjectNamespace;
+  private namespace: DurableObjectNamespace;
 
-  constructor(sessionNamespace: DurableObjectNamespace) {
-    this.sessionNamespace = sessionNamespace;
+  constructor(namespace: DurableObjectNamespace) {
+    this.namespace = namespace;
   }
 
-  // Create a new session
-  async createSession(
-    userId: string,
-    mode: InterviewMode,
-    jobType: string,
-    difficulty?: Difficulty,
-    estimatedDuration?: number
-  ): Promise<string> {
-    const sessionId = crypto.randomUUID();
-    const stub = this.sessionNamespace.get(this.sessionNamespace.idFromName(sessionId));
+  getSessionStub(sessionId: string): DurableObjectStub {
+    const id = this.namespace.idFromName(sessionId);
+    return this.namespace.get(id);
+  }
 
-    // Use /start endpoint
+  async createSession(userId: string, mode: InterviewMode, jobType: string, difficulty: Difficulty, estimatedDuration: number = 45): Promise<{ sessionId: string, session: InterviewSession }> {
+    const sessionId = crypto.randomUUID();
+    const stub = this.getSessionStub(sessionId);
     const response = await stub.fetch("http://internal/start", {
       method: "POST",
-      body: JSON.stringify({
-        userId,
-        mode,
-        jobType,
-        difficulty,
-        estimatedDuration,
-        sessionId // Add sessionId to the data
-      }),
-      headers: { "Content-Type": "application/json" }
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, mode, jobType, difficulty, estimatedDuration, sessionId })
     });
 
     if (!response.ok) {
       throw new Error("Failed to create session");
     }
 
-    return sessionId;
-  }
-
-  // Get session stub
-  getSessionStub(sessionId: string): DurableObjectStub {
-    return this.sessionNamespace.get(this.sessionNamespace.idFromName(sessionId));
-  }
-
-  // Get session summary
-  async getSessionSummary(sessionId: string): Promise<any> {
-    const stub = this.getSessionStub(sessionId);
-    const response = await stub.fetch("http://internal/summary");
-
-    if (!response.ok) {
-      throw new Error("Failed to get session summary");
-    }
-
-    return response.json();
-  }
-
-  // Clean up old sessions
-  async cleanupOldSessions(): Promise<void> {
-    // This would need to be implemented based on how you track active sessions
-    // For now, it's a placeholder for future implementation
+    const data = await response.json() as any;
+    return { sessionId, session: data.session };
   }
 }

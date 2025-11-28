@@ -56,6 +56,8 @@ export class VoiceChat extends OpenAPIRoute {
             const currentQuestionData = await currentQuestionRes.json() as any;
             const currentQuestion = currentQuestionData.question;
 
+            console.log(currentQuestion)
+
             const voiceAgent = new VoiceAgent(AI);
             let result: { userTranscript: string; aiResponse: string; audio: ArrayBuffer };
 
@@ -68,25 +70,25 @@ export class VoiceChat extends OpenAPIRoute {
                     let context = "You are Alex, a senior technical recruiter at a top tech company. This is the start of the interview.";
                     if (currentQuestion) {
                         context += `\nThe first question will be: ${currentQuestion.title}.`;
-                        context += "\nGoal: Introduce yourself briefly, welcome the candidate, and transition smoothly into the first question.";
+                        context += "\nGoal: Introduce yourself briefly, welcome the candidate, and transition smoothly into the first question. Simulate a real interview.";
                     } else {
-                        context += "\nGoal: Introduce yourself briefly, welcome the candidate, and start a general behavioral interview.";
+                        context += "\nGoal: Introduce yourself briefly, welcome the candidate, and start a general behavioral interview. Simulate a real interview.";
                     }
 
-                    const systemPrompt = "You are Alex, a professional and friendly technical interviewer. Introduce yourself and welcome the candidate. Keep it under 2 sentences. Be encouraging.";
+                    const systemPrompt = "You are Alex, a professional and real technical interviewer. Introduce yourself and welcome the candidate. Keep it under 2 sentences. Simulate a real interview.";
 
                     const messages = [
                         { role: "system", content: systemPrompt },
-                        { role: "user", content: `Context: ${context}\n\nTask: Generate a welcome message.` }
+                        { role: "user", content: `Context: ${context}\n\nTask: Start the interview.` }
                     ];
 
                     const llmResponse = await AI.run("@cf/meta/llama-3.3-70b-instruct-fp8-fast", {
                         messages,
-                        max_tokens: 150
+                        max_tokens: 300
                     });
 
                     const greetingText = llmResponse.response || "Hello! I'm Alex. Ready to start?";
-
+                    console.log("Greeting Text: ", greetingText);
                     // Generate Audio
                     const audioResponse = await AI.run("@cf/deepgram/aura-2-es", {
                         text: greetingText
@@ -98,6 +100,8 @@ export class VoiceChat extends OpenAPIRoute {
                     } else {
                         audioBuffer = audioResponse;
                     }
+
+                    console.log("Audio Buffer: ", audioBuffer);
 
                     result = {
                         userTranscript: "[Session Started]",
@@ -126,13 +130,13 @@ export class VoiceChat extends OpenAPIRoute {
 
                     if (interviewMode === 'technical') {
                         context += `\n\nCandidate's Current Code:\n\`\`\`${currentQuestion.language || 'javascript'}\n${currentCode}\n\`\`\``;
-                        context += "\nGoal: Guide the candidate through this technical problem. You can also ask theoretical questions related to the concepts used, or behavioral questions about their past experience with these technologies. Don't give the code answer directly, but provide hints.";
+                        context += "\nGoal: Guide the candidate through this technical problem. You can also ask theoretical questions related to the concepts used, or behavioral questions about their past experience with these technologies. Don't give the code answer directly, but provide hints only when needed. This is a technical interview.";
                     } else {
-                        context += "\nGoal: This is a behavioral interview based on a specific scenario. Use the STAR method to guide them.";
+                        context += "\nGoal: This is a behavioral interview based on a specific scenario. Ask questions that will help you understand the candidate's past experience. Simulate a real interview.";
                     }
                 } else {
-                    context += "\nNo specific question selected. Conduct a general behavioral interview using the STAR method.";
-                    context += "\nGoal: Assess the candidate's soft skills and past experience.";
+                    context += "\nNo specific question selected. Conduct a general behavioral interview.";
+                    context += "\nGoal: Assess the candidate's soft skills and past experience. Simulate a real interview.";
                 }
 
                 // 3. Process Voice

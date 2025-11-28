@@ -26,6 +26,7 @@ import sys
 from pathlib import Path
 
 
+
 def run_command(command: str, description: str) -> bool:
     """Run a command and return success status."""
     print(f"\n{'='*60}")

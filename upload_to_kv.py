@@ -26,7 +26,8 @@ from urllib.parse import quote_plus
 import requests
 from tqdm import tqdm
 
-
+LAST_PROBLEM_ID = 1930
+ERROR_PROBLEM_ID = 1262
 class CloudflareKVUploader:
     """Handles uploading data to Cloudflare KV using the REST API."""
     
@@ -126,6 +127,11 @@ def parse_csv_row(row: Dict[str, str]) -> Optional[Dict[str, Any]]:
         # Extract basic fields
         frontend_question_id = row.get('frontendQuestionId', '').strip()
         if not frontend_question_id:
+            return None
+        
+        if int(frontend_question_id) <= LAST_PROBLEM_ID:
+            return None
+        if int(frontend_question_id) == ERROR_PROBLEM_ID:
             return None
         
         # Parse topics from string to list

@@ -74,7 +74,8 @@ export const useVoiceInterface = ({
 
     const playAudioResponse = async (audioData: ArrayBuffer) => {
         try {
-            if (!audioContextRef.current) {
+            // Re-create context if it doesn't exist or is closed
+            if (!audioContextRef.current || audioContextRef.current.state === 'closed') {
                 audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
             }
 
@@ -169,18 +170,20 @@ export const useVoiceInterface = ({
         window.speechSynthesis.cancel();
         setIsSpeaking(false);
     }, []);
-
     const playGreeting = useCallback(async () => {
         if (!sessionId) return;
 
         try {
             // Ensure audio context is ready
-            if (!audioContextRef.current) {
+            console.log("Playing greeting");
+            if (!audioContextRef.current || audioContextRef.current.state === 'closed') {
                 audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
             }
+            console.log("Audio context state:", audioContextRef.current?.state);
             if (audioContextRef.current.state === 'suspended') {
                 await audioContextRef.current.resume();
             }
+            console.log("Audio context state after resume:", audioContextRef.current?.state);
 
             const response = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}/chat`, {
                 method: 'POST',
@@ -189,6 +192,7 @@ export const useVoiceInterface = ({
                 },
                 body: JSON.stringify({ action: 'greeting' })
             });
+            console.log("Response status:", response.status);
 
             if (response.ok) {
                 // Get transcript from header
@@ -199,10 +203,13 @@ export const useVoiceInterface = ({
                         onTranscript(transcriptText);
                     }
                 }
-
+                console.log("Transcript:", transcriptText);
+                console.log("Response body:", response.body);
+                console.log(response)
                 // Get audio data
                 const audioData = await response.arrayBuffer();
                 await playAudioResponse(audioData);
+
             }
         } catch (err) {
             console.error("Error playing greeting:", err);

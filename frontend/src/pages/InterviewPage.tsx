@@ -46,7 +46,7 @@ const InterviewPage: React.FC = () => {
 
     // Voice Interface Integration
     const handleVoiceTranscript = useCallback((text: string) => {
-        setAnswerText(prev => prev + (prev ? ' ' : '') + text);
+        setAnswerText(prev => prev + (prev ? '\n' : '') + text);
     }, []);
 
     const {
@@ -63,24 +63,27 @@ const InterviewPage: React.FC = () => {
     });
 
     // Trigger initial greeting
+    const greetingPlayedRef = React.useRef<string | null>(null);
+
     useEffect(() => {
         if (currentSession?.sessionId && sessionHistory.length <= 1) {
             // Only greet if history is empty or just has the initial question
-            // and we haven't greeted yet (handled by backend or simple check)
-            playGreeting();
+            // and we haven't greeted yet for this session
+            if (greetingPlayedRef.current !== currentSession.sessionId) {
+                playGreeting();
+                greetingPlayedRef.current = currentSession.sessionId;
+            }
         }
-    }, [currentSession?.sessionId, playGreeting]);
+    }, [currentSession?.sessionId, playGreeting, sessionHistory.length]);
 
     // Speak AI responses automatically - DISABLED to avoid conflict with VoiceChat audio
     // If we want text-to-speech for text submissions, we can re-enable this with logic to distinguish sources
-    /*
     useEffect(() => {
         const lastHistoryItem = sessionHistory[sessionHistory.length - 1];
         if (lastHistoryItem && lastHistoryItem.type === 'ai_response') {
             speak(lastHistoryItem.content.content);
         }
     }, [sessionHistory, speak]);
-    */
 
     // Simulate timer for interview
     useEffect(() => {
@@ -248,17 +251,6 @@ const InterviewPage: React.FC = () => {
                     {/* Answer Form */}
                     <div className="answer-section">
                         <h3>Your Response</h3>
-
-                        {/* Text Answer */}
-                        <div className="answer-input">
-                            <textarea
-                                value={answerText}
-                                onChange={(e) => setAnswerText(e.target.value)}
-                                placeholder="Type your answer here or use voice input..."
-                                rows={4}
-                                disabled={loading}
-                            />
-                        </div>
 
                         {/* Code Editor (for technical questions) */}
                         {currentQuestion?.type === 'coding' && (
