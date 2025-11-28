@@ -1,0 +1,38 @@
+@startuml
+!theme vibrant
+
+actor User
+participant "Frontend" as FE
+participant "Worker API" as API
+participant "Workers AI" as AI
+database "KV Store" as KV
+
+== Session Start ==
+User -> FE: Click "Start Interview"
+FE -> API: POST /api/sessions
+API -> KV: Fetch Question
+KV --> API: Question Data
+API -> KV: Create Session
+API --> FE: Session ID + Question
+
+== Voice Interaction Loop ==
+User -> FE: Speak (Audio)
+FE -> API: POST /api/chat (Audio Blob)
+API -> AI: Whisper (Audio -> Text)
+AI --> API: Transcribed Text
+API -> AI: Llama 3 (Context + Text)
+AI --> API: AI Response Text
+API -> AI: Deepgram (Text -> Audio)
+AI --> API: Audio Stream
+API --> FE: AI Audio Response
+FE -> User: Play Audio
+
+== Code Submission ==
+User -> FE: Submit Code
+FE -> API: POST /api/submit
+API -> AI: Analyze Code
+AI --> API: Feedback & Rating
+API -> KV: Update Session Stats
+API --> FE: Success & Feedback
+
+@enduml

@@ -1,0 +1,39 @@
+@startuml
+!theme vibrant
+
+package "Frontend (React)" {
+  [User Interface] as UI
+  [Audio Recorder] as AudioRec
+  [Code Editor] as Editor
+}
+
+package "Cloudflare Worker" {
+  [Hono Router] as Router
+  [Session Manager] as Session
+  [Voice Agent] as Voice
+}
+
+package "Cloudflare Services" {
+  database "KV Storage" as KV {
+    [Questions]
+    [Sessions]
+  }
+  
+  node "Workers AI" as AI {
+    [Whisper (STT)]
+    [Llama 3 (LLM)]
+    [Deepgram (TTS)]
+  }
+}
+
+UI --> Router : HTTP Requests
+AudioRec --> Router : Audio Stream
+Editor --> Router : Code Submission
+
+Router --> Session : Manage State
+Router --> Voice : Process Audio
+
+Session --> KV : Read/Write State
+Voice --> AI : Inference Requests
+
+@enduml
