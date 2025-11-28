@@ -69,18 +69,29 @@
 
 /* Setup Card Styles */
 .setup-card {
-    background-color: var(--card-bg);
-    padding: 2rem;
-    border-radius: 16px;
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-    border: 1px solid var(--border-color);
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    padding: 2.5rem;
+    border-radius: 24px;
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.setup-card:hover {
+    box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.4);
+    border-color: rgba(255, 255, 255, 0.2);
 }
 
 .setup-card h2 {
     margin-top: 0;
-    margin-bottom: 1.5rem;
-    font-size: 1.5rem;
+    margin-bottom: 2rem;
+    font-size: 1.75rem;
     color: var(--text-primary);
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    text-align: center;
 }
 
 .setup-form {
@@ -92,28 +103,38 @@
 .form-group {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: 0.75rem;
 }
 
 .form-group label {
     font-size: 0.9rem;
-    font-weight: 500;
+    font-weight: 600;
     color: var(--text-secondary);
     display: flex;
     align-items: center;
     gap: 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
 .form-group input,
 .form-group select,
 .form-group textarea {
-    padding: 0.75rem 1rem;
-    border-radius: 8px;
-    border: 1px solid var(--border-color);
-    background-color: var(--bg-secondary);
+    padding: 1rem 1.25rem;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background-color: rgba(0, 0, 0, 0.2);
     color: var(--text-primary);
     font-size: 1rem;
-    transition: all 0.2s;
+    transition: all 0.2s ease;
+    font-family: 'Inter', sans-serif;
+}
+
+.form-group input:hover,
+.form-group select:hover,
+.form-group textarea:hover {
+    border-color: rgba(255, 255, 255, 0.2);
+    background-color: rgba(0, 0, 0, 0.3);
 }
 
 .form-group input:focus,
@@ -121,19 +142,20 @@
 .form-group textarea:focus {
     outline: none;
     border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px var(--primary-light);
+    background-color: rgba(0, 0, 0, 0.4);
+    box-shadow: 0 0 0 4px rgba(var(--primary-rgb), 0.1);
 }
 
 .form-row {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 1rem;
+    gap: 1.5rem;
 }
 
 .mode-selection {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: 0.75rem;
 }
 
 .mode-options {
@@ -146,50 +168,71 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 0.5rem;
-    padding: 1rem;
-    border-radius: 8px;
-    border: 1px solid var(--border-color);
-    background-color: var(--bg-secondary);
+    gap: 0.75rem;
+    padding: 1.5rem;
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background-color: rgba(0, 0, 0, 0.2);
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
 }
 
 .mode-option:hover {
     border-color: var(--primary-color);
-    background-color: var(--bg-color);
+    background-color: rgba(0, 0, 0, 0.3);
+    transform: translateY(-2px);
 }
 
 .mode-option.selected {
     border-color: var(--primary-color);
-    background-color: var(--primary-light);
+    background-color: rgba(var(--primary-rgb), 0.1);
     color: var(--primary-color);
+    box-shadow: 0 4px 20px rgba(var(--primary-rgb), 0.2);
 }
 
 .mode-option svg {
-    font-size: 1.5rem;
+    font-size: 2rem;
+    transition: transform 0.3s ease;
+}
+
+.mode-option:hover svg {
+    transform: scale(1.1);
 }
 
 .cta-button.full-width {
     width: 100%;
-    margin-top: 0.5rem;
-    padding: 1rem;
-    background-color: var(--primary-color);
+    margin-top: 1rem;
+    padding: 1.25rem;
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-dark, #0056b3));
     color: white;
     border: none;
-    border-radius: 8px;
+    border-radius: 12px;
     font-size: 1.1rem;
     cursor: pointer;
-    font-weight: 600;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(var(--primary-rgb), 0.3);
+    text-transform: uppercase;
 }
 
 .cta-button.full-width:hover {
-    opacity: 0.9;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(var(--primary-rgb), 0.4);
+    filter: brightness(1.1);
+}
+
+.cta-button.full-width:active {
+    transform: translateY(0);
 }
 
 .cta-button.full-width:disabled {
-    background-color: var(--text-secondary);
+    background: var(--text-secondary);
     cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
 }
 
 /* Responsive Design */

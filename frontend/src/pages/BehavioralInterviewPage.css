@@ -95,7 +95,7 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 2rem;
+    padding: 6rem 2rem 2rem; /* Increased top padding */
     max-width: 800px;
     margin: 0 auto;
     width: 100%;

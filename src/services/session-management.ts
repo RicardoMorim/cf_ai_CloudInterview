@@ -205,9 +205,70 @@ ${limitedPool.map((p: any) => `${p.id}: ${p.title} (${p.topics.join(', ')})`).jo
         console.error("DO: Error fetching questions:", error);
       }
     } else if (mode === InterviewMode.BEHAVIORAL) {
-      const { BEHAVIORAL_SCENARIOS } = await import("../data/questions");
-      if (BEHAVIORAL_SCENARIOS.length > 0) {
-        selectedQuestions.push(BEHAVIORAL_SCENARIOS[0]);
+      try {
+        const prompt = `
+You are an expert behavioral interviewer.
+Job Role: ${jobType}
+${jobTitle ? `Job Title: ${jobTitle}` : ''}
+${seniority ? `Seniority Level: ${seniority}` : ''}
+${jobDescription ? `Job Description Context: ${jobDescription.substring(0, 500)}...` : ''}
+
+Task: Generate a behavioral interview question tailored to this specific role and seniority.
+The question should assess soft skills relevant to the position (e.g., leadership for seniors, learning for juniors).
+
+Return ONLY the JSON object with this structure:
+{
+  "questionId": "gen_beh_${Date.now()}",
+  "title": "Short Title",
+  "text": "The full question text...",
+  "difficulty": "${difficulty}",
+  "tags": ["Tag1", "Tag2"],
+  "hints": ["Hint 1", "Hint 2"]
+}
+`;
+        const response = await this.env.AI.run("@cf/meta/llama-3.3-70b-instruct-fp8-fast", {
+          messages: [{ role: "user", content: prompt }]
+        });
+
+        let responseText = "";
+        if (response) {
+          if (typeof response.response === 'string') {
+            responseText = response.response;
+          } else if (typeof response === 'string') {
+            responseText = response;
+          } else if (response.result && typeof response.result.response === 'string') {
+            responseText = response.result.response;
+          }
+        }
+
+        const cleanResponse = responseText.replace(/```json|```/g, '').trim();
+        const questionData = JSON.parse(cleanResponse);
+
+        selectedQuestions.push({
+          questionId: questionData.questionId || `gen_beh_${Date.now()}`,
+          type: QuestionType.BEHAVIORAL,
+          category: "Behavioral",
+          difficulty: difficulty,
+          title: questionData.title || "Behavioral Question",
+          text: questionData.text || "Tell me about a time you faced a challenge.",
+          tags: questionData.tags || ["Behavioral"],
+          estimatedTime: 15,
+          followUpQuestions: [],
+          hints: questionData.hints || [],
+          metadata: {
+            difficultyWeight: 1,
+            popularity: 0,
+            lastUpdated: new Date().toISOString(),
+            relatedQuestions: []
+          }
+        });
+
+      } catch (error) {
+        console.error("DO: Failed to generate behavioral question, falling back to static:", error);
+        const { BEHAVIORAL_SCENARIOS } = await import("../data/questions");
+        if (BEHAVIORAL_SCENARIOS.length > 0) {
+          selectedQuestions.push(BEHAVIORAL_SCENARIOS[0]);
+        }
       }
     }
 
