@@ -19,25 +19,23 @@
     //   "preview_id": "<ID_OF_PREVIEW_KV_NAMESPACE_FOR_LOCAL_DEVELOPMENT>"
     }
   ],
+  "ai": {
+    "binding": "AI"
+  },
   "durable_objects": {
     "bindings": [
       {
         "name": "SESSION_NAMESPACE",
-        "class_name": "InterviewSessionDO"
+        "class_name": "Session"
       }
     ]
-  },
-  "ai": {
-    "binding": "AI"
   },
   "migrations": [
     {
       "tag": "v1",
-      "new_classes": [
-        "InterviewSessionDO"
-      ]
+      "new_classes": ["Session"]
     }
-  ]
+  ],
 	/**
 	 * Smart Placement
 	 * Docs: https://developers.cloudflare.com/workers/configuration/smart-placement/#smart-placement
