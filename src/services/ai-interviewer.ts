@@ -103,13 +103,13 @@ Generate your response:
     });
 
     const content = this.extractResponseText(response);
-    
+
     // Analyze sentiment
     const sentiment = await this.analyzeSentiment(content);
-    
+
     // Determine if follow-up is needed
     const followUp = this.shouldFollowUp(content, userAnswer);
-    
+
     // Calculate confidence based on response length and engagement
     const confidence = this.calculateConfidence(content, userAnswer);
 
@@ -179,7 +179,7 @@ Format your response as JSON with the following structure:
       });
 
       const evaluation = this.extractResponseText(response);
-      
+
       // Parse JSON response
       try {
         const parsed = JSON.parse(evaluation);
@@ -293,7 +293,7 @@ Format as JSON:
       });
 
       const evaluation = this.extractResponseText(response);
-      
+
       try {
         const parsed = JSON.parse(evaluation);
         return {
@@ -344,14 +344,21 @@ Guidelines:
 Generate the introduction:
 `;
 
-    // Use Llama 3.3 model for better opening introductions
-    const response = await this.AI.run("@cf/meta/llama-3.3-70b-instruct-fp8-fast", {
-      prompt: introPrompt,
-      temperature: 0.6,
-      max_tokens: 200
-    });
+    console.log("AIInterviewerAgent: Generating opening introduction...");
+    try {
+      // Use Llama 3.3 model for better opening introductions
+      const response = await this.AI.run("@cf/meta/llama-3.3-70b-instruct-fp8-fast", {
+        prompt: introPrompt,
+        temperature: 0.6,
+        max_tokens: 200
+      });
 
-    return this.extractResponseText(response) || "Welcome! Let's begin your interview.";
+      console.log("AIInterviewerAgent: Generated introduction successfully");
+      return this.extractResponseText(response) || "Welcome! Let's begin your interview.";
+    } catch (error) {
+      console.error("AIInterviewerAgent: Error generating introduction:", error);
+      return `Welcome to your ${mode} interview for the ${jobType} position. I'm Alex, your AI interviewer. I'll be asking you a series of questions to assess your skills and experience. Please take your time and answer to the best of your ability. Let's get started!`;
+    }
   }
 
   // Generate closing remarks
@@ -424,7 +431,7 @@ Return as JSON:
 
       const responseText = this.extractResponseText(response);
       const questionData = JSON.parse(responseText || "{}");
-      
+
       return {
         questionId: questionData.questionId || `scenario_${Date.now()}`,
         type: questionData.type || QuestionType.SCENARIO,
@@ -495,7 +502,7 @@ Respond with only one word.
       });
 
       const sentiment = this.extractResponseText(response)?.trim().toLowerCase();
-      
+
       switch (sentiment) {
         case "positive":
           return Sentiment.POSITIVE;
@@ -512,23 +519,23 @@ Respond with only one word.
   private shouldFollowUp(content: string, userAnswer?: string): boolean {
     // Simple heuristic: if the response asks a question or mentions follow-up
     const lowerContent = content.toLowerCase();
-    return lowerContent.includes("what about") || 
-           lowerContent.includes("how would you") ||
-           lowerContent.includes("can you explain") ||
-           lowerContent.includes("tell me more") ||
-           lowerContent.includes("why did you");
+    return lowerContent.includes("what about") ||
+      lowerContent.includes("how would you") ||
+      lowerContent.includes("can you explain") ||
+      lowerContent.includes("tell me more") ||
+      lowerContent.includes("why did you");
   }
 
   private calculateConfidence(content: string, userAnswer?: string): number {
     if (!userAnswer) return 0.8; // High confidence for initial responses
-    
+
     const contentLength = content.length;
     const answerLength = userAnswer.length;
-    
+
     // Confidence based on engagement and response quality
     if (contentLength < 50) return 0.3;
     if (contentLength > 500) return 0.9;
-    
+
     return 0.3 + (contentLength / 1000);
   }
 }

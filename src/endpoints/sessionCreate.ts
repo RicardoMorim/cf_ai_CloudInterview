@@ -1,6 +1,7 @@
 import { OpenAPIRoute } from "chanfana";
 import { z } from "zod";
 import { AppContext } from "../types";
+import { SessionManager } from "../services/session-management";
 
 export class SessionCreate extends OpenAPIRoute {
 	schema = {
@@ -82,16 +83,18 @@ export class SessionCreate extends OpenAPIRoute {
 		const data = await this.getValidatedData<typeof this.schema>();
 		const { mode, jobType, difficulty, duration, language, includeCoding, topics } = data.body;
 
-		// Get AI and KV bindings
-        const { AI, KV, SESSION_NAMESPACE } = c.env as any;
+		// Get KV binding
+		const { SESSION_NAMESPACE } = c.env as any;
 
 		try {
 			// TODO: Get user from auth (placeholder for now)
 			const userId = "user_123";
 
+			console.log("SessionCreate: Initializing SessionManager");
 			// Create session using SessionManager
-			const { SessionManager } = await import("../services/session-management");
 			const sessionManager = new SessionManager(SESSION_NAMESPACE);
+
+			console.log("SessionCreate: Calling createSession");
 			const sessionId = await sessionManager.createSession(
 				userId,
 				mode as any,
@@ -99,25 +102,22 @@ export class SessionCreate extends OpenAPIRoute {
 				difficulty as any,
 				duration
 			);
+			console.log("SessionCreate: Session created with ID:", sessionId);
 
-			// Get session stub and begin session
-			const sessionStub = SESSION_NAMESPACE.get(SESSION_NAMESPACE.idFromName(sessionId));
-			const sessionResponse = await sessionStub.fetch("/begin");
-			const sessionData = await sessionResponse.json();
-
-			// Generate AI interviewer introduction
-			const { AIInterviewerAgent } = await import("../services/ai-interviewer");
-			const aiAgent = new AIInterviewerAgent(AI);
-			const introduction = await aiAgent.generateOpeningIntroduction(
-				mode,
-				jobType,
-				"mid-level experience" // TODO: Get from user profile
-			);
+			// We removed the blocking AI generation here.
+			// The introduction will be handled by the voice agent or generated lazily.
+			const introduction = `Welcome to your ${mode} interview for the ${jobType} position. I'm Alex, your AI interviewer.`;
 
 			return {
 				success: true,
 				session: {
-					...sessionData.session,
+					sessionId,
+					mode,
+					jobType,
+					difficulty,
+					status: "active",
+					createdAt: new Date().toISOString(),
+					estimatedDuration: duration,
 					questionCount: 6, // TODO: Calculate based on mode and duration
 					aiInterviewer: {
 						name: "Alex",
@@ -132,7 +132,9 @@ export class SessionCreate extends OpenAPIRoute {
 				}
 			};
 		} catch (error) {
+			console.error("SessionCreate: Error creating session:", error);
 			return {
+				status: 500,
 				success: false,
 				error: {
 					code: "SESSION_CREATION_FAILED",

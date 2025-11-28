@@ -1,19 +1,29 @@
 // Interview Session Management Service using Durable Objects
 
-import { InterviewSession, InterviewQuestion, InterviewAnswer, AIResponse, InterviewMode, InterviewStatus, Difficulty } from "../types";
+import { InterviewSession, InterviewQuestion, InterviewAnswer, AIResponse, InterviewMode, InterviewStatus, Difficulty, QuestionType, Sentiment, AIResponseType } from "../types";
 import { InterviewSessionRepository } from "./interfaces";
+
+interface Env {
+  SESSION_NAMESPACE: DurableObjectNamespace;
+  KV: KVNamespace;
+  AI: any;
+}
 
 export class InterviewSessionDO {
   private state: DurableObjectState;
+  private env: Env;
   private session: InterviewSession | null = null;
   private timerId: NodeJS.Timeout | null = null;
 
   constructor(state: DurableObjectState, env: Env) {
     this.state = state;
-    
+    this.env = env;
+
     // Wait for the state to be ready
     this.state.blockConcurrencyWhile(async () => {
+      console.log("DO: Loading session data...");
       await this.loadSession();
+      console.log("DO: Session data loaded");
     });
 
     // Set up automatic cleanup for expired sessions
@@ -62,6 +72,90 @@ export class InterviewSessionDO {
     }
 
     const now = new Date().toISOString();
+
+    // Select questions based on mode
+    let selectedQuestions: InterviewQuestion[] = [];
+
+    if (mode === InterviewMode.TECHNICAL) {
+      try {
+        // 1. Fetch essentials list from KV
+        const essentialsData = await this.state.storage.get<any>("essentials") || // Try local storage first (caching)
+          await this.env.KV.get("essentials", { type: "json" });
+
+        if (essentialsData && essentialsData.problems) {
+          // 2. Filter problems
+          const candidates = essentialsData.problems.filter((p: any) => {
+            return p.difficulty && p.difficulty.toLowerCase() === difficulty.toLowerCase();
+          });
+
+          const pool = candidates.length > 0 ? candidates : essentialsData.problems;
+          const limitedPool = pool.slice(0, 50);
+
+          // 3. Ask AI to select a question
+          let selectedId = 0;
+          try {
+            const prompt = `
+You are an expert technical interviewer. 
+Job Role: ${jobType}
+Difficulty: ${difficulty}
+Task: Select the most suitable coding problem from the list below for this interview.
+Rules:
+- Return ONLY the ID of the selected problem.
+- If no problem is suitable or you prefer to ask theoretical questions generated on the fly, return 0.
+- Do not add any explanation or text, just the number.
+
+Problems:
+${limitedPool.map((p: any) => `${p.id}: ${p.title} (${p.topics.join(', ')})`).join('\n')}
+`;
+            const response = await this.env.AI.run("@cf/meta/llama-3.3-70b-instruct-fp8-fast", {
+              messages: [{ role: "user", content: prompt }]
+            });
+
+            const responseText = response.response.trim();
+            const parsedId = parseInt(responseText.match(/\d+/)?.[0] || "0");
+            selectedId = isNaN(parsedId) ? 0 : parsedId;
+            console.log(`DO: AI selected question ID: ${selectedId}`);
+
+          } catch (aiError) {
+            console.error("DO: AI selection failed, falling back to random:", aiError);
+            if (pool.length > 0) {
+              selectedId = pool[Math.floor(Math.random() * pool.length)].id;
+            }
+          }
+
+          if (selectedId > 0) {
+            // 4. Fetch full details
+            const fullProblem = await this.env.KV.get(`problem:${selectedId}`, { type: "json" }) as any;
+
+            if (fullProblem) {
+              selectedQuestions.push({
+                questionId: fullProblem.id.toString(),
+                type: QuestionType.CODING,
+                category: fullProblem.metadata?.category || "General",
+                difficulty: fullProblem.difficulty as Difficulty,
+                title: fullProblem.title,
+                text: fullProblem.description,
+                tags: fullProblem.metadata?.topics || [],
+                estimatedTime: 20,
+                followUpQuestions: [],
+                hints: fullProblem.metadata?.hints || [],
+                metadata: {
+                  difficultyWeight: 1,
+                  popularity: fullProblem.metadata?.likes || 0,
+                  lastUpdated: new Date().toISOString(),
+                  relatedQuestions: []
+                }
+              });
+            }
+          }
+        }
+      } catch (error) {
+        console.error("DO: Error fetching questions from KV:", error);
+      }
+    } else if (mode === InterviewMode.BEHAVIORAL) {
+      // Behavioral questions generated on the fly
+    }
+
     this.session = {
       sessionId: this.state.id.toString(),
       userId,
@@ -74,7 +168,7 @@ export class InterviewSessionDO {
       completedAt: null,
       duration: 0,
       currentQuestionIndex: 0,
-      questions: [],
+      questions: selectedQuestions,
       answers: [],
       aiResponses: [],
       feedback: undefined,
@@ -99,7 +193,7 @@ export class InterviewSessionDO {
 
     this.session.status = InterviewStatus.IN_PROGRESS;
     this.session.startedAt = new Date().toISOString();
-    
+
     await this.saveSession();
     return this.session;
   }
@@ -142,7 +236,7 @@ export class InterviewSessionDO {
 
     // Add the answer to the session
     this.session.answers.push(answer);
-    
+
     // Update session duration
     if (this.session.startedAt) {
       const now = new Date();
@@ -195,7 +289,7 @@ export class InterviewSessionDO {
 
     this.session.status = InterviewStatus.COMPLETED;
     this.session.completedAt = new Date().toISOString();
-    
+
     // Update duration
     if (this.session.startedAt) {
       const now = new Date();
@@ -204,7 +298,7 @@ export class InterviewSessionDO {
     }
 
     await this.saveSession();
-    
+
     // Clean up timer
     if (this.timerId) {
       clearInterval(this.timerId);
@@ -222,9 +316,9 @@ export class InterviewSessionDO {
 
     this.session.status = InterviewStatus.CANCELLED;
     this.session.completedAt = new Date().toISOString();
-    
+
     await this.saveSession();
-    
+
     // Clean up timer
     if (this.timerId) {
       clearInterval(this.timerId);
@@ -269,7 +363,7 @@ export class InterviewSessionDO {
     for (let i = 0; i < this.session.questions.length; i++) {
       const question = this.session.questions[i];
       const answer = this.session.answers.find(a => a.questionId === question.questionId);
-      
+
       transcript.push({
         type: "question",
         content: question.text,
@@ -302,11 +396,13 @@ export class InterviewSessionDO {
         timestamp: response.generatedAt,
         metadata: {
           responseType: response.type,
-          sentiment: response.sentiment,
-          followUp: response.followUp
+          sentiment: response.sentiment
         }
       });
     });
+
+    // Sort by timestamp
+    transcript.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 
     return {
       session: this.session,
@@ -314,155 +410,140 @@ export class InterviewSessionDO {
     };
   }
 
-  // Get session summary
-  async getSessionSummary(): Promise<{
-    session: InterviewSession;
-    statistics: {
-      totalQuestions: number;
-      answeredQuestions: number;
-      averageResponseTime: number;
-      estimatedCompletionTime: number;
-    };
-  }> {
-    if (!this.session) {
-      throw new Error("No session found");
-    }
-
-    const totalQuestions = this.session.questions.length;
-    const answeredQuestions = this.session.answers.length;
-    const averageResponseTime = answeredQuestions > 0 
-      ? this.session.answers.reduce((sum, answer) => sum + answer.responseTime, 0) / answeredQuestions
-      : 0;
-
-    // Estimate completion time based on answered questions vs total questions
-    const estimatedCompletionTime = totalQuestions > 0 
-      ? (this.session.duration / answeredQuestions) * totalQuestions
-      : 0;
-
-    return {
-      session: this.session,
-      statistics: {
-        totalQuestions,
-        answeredQuestions,
-        averageResponseTime,
-        estimatedCompletionTime
-      }
-    };
-  }
-
-  // Clean up expired session data
-  async cleanup(): Promise<void> {
-    if (this.timerId) {
-      clearInterval(this.timerId);
-      this.timerId = null;
-    }
-    if (this.session) {
-      const now = new Date();
-      const created = new Date(this.session.createdAt);
-      const ageInHours = (now.getTime() - created.getTime()) / (1000 * 60 * 60);
-
-      // Delete sessions older than 24 hours
-      if (ageInHours > 24) {
-        await this.state.storage.deleteAll();
-        this.session = null;
-      }
-    }
-  }
-
-  // HTTP handler for external API calls
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
     const path = url.pathname;
+    console.log(`DO: Handling fetch request for path: ${path}`);
 
     try {
       switch (path) {
         case "/start":
-          const startData = await request.json() as {
-            userId: string;
-            mode: InterviewMode;
-            jobType: string;
-            difficulty?: Difficulty;
-            estimatedDuration?: number;
-          };
-          
-          const session = await this.startSession(
-            startData.userId,
-            startData.mode,
-            startData.jobType,
-            startData.difficulty,
-            startData.estimatedDuration
-          );
-          
-          return new Response(JSON.stringify({ success: true, session }), {
+          if (request.method !== "POST") {
+            return new Response("Method Not Allowed", { status: 405 });
+          }
+          const { userId, mode, jobType, difficulty, estimatedDuration, sessionId } = await request.json() as any;
+          await this.startSession(userId, mode, jobType, difficulty, estimatedDuration);
+          if (sessionId) {
+             this.session!.sessionId = sessionId;
+             await this.saveSession();
+          }
+          return new Response(JSON.stringify({ success: true, session: this.session }), {
             headers: { "Content-Type": "application/json" }
           });
 
         case "/begin":
-          const startedSession = await this.beginSession();
-          return new Response(JSON.stringify({ success: true, session: startedSession }), {
-            headers: { "Content-Type": "application/json" }
-          });
-
-        case "/question/current":
-          const currentQuestion = await this.getCurrentQuestion();
-          return new Response(JSON.stringify({ 
-            success: true, 
-            question: currentQuestion,
-            hasMore: currentQuestion !== null
-          }), {
-            headers: { "Content-Type": "application/json" }
-          });
+           if (request.method !== "POST") {
+             return new Response("Method Not Allowed", { status: 405 });
+           }
+           const firstQuestion = await this.getCurrentQuestion();
+           return new Response(JSON.stringify({ success: true, question: firstQuestion, session: this.session }), {
+             headers: { "Content-Type": "application/json" }
+           });
 
         case "/answer":
-          if (request.method === "POST") {
-            const answerData = await request.json() as InterviewAnswer;
-            const result = await this.submitAnswer(answerData);
-            return new Response(JSON.stringify({ success: true, ...result }), {
-              headers: { "Content-Type": "application/json" }
-            });
+          if (request.method !== "POST") {
+            return new Response("Method Not Allowed", { status: 405 });
           }
-          break;
-
-        case "/question/next":
-          const nextResult = await this.nextQuestion();
-          return new Response(JSON.stringify({ success: true, ...nextResult }), {
+          const answer = await request.json() as any;
+          const result = await this.submitAnswer(answer);
+          return new Response(JSON.stringify({ success: true, ...result }), {
             headers: { "Content-Type": "application/json" }
           });
 
+        case "/next":
+           if (request.method !== "POST") {
+             return new Response("Method Not Allowed", { status: 405 });
+           }
+           const nextResult = await this.nextQuestion();
+           return new Response(JSON.stringify({ success: true, ...nextResult }), {
+             headers: { "Content-Type": "application/json" }
+           });
+
         case "/complete":
+          if (request.method !== "POST") {
+            return new Response("Method Not Allowed", { status: 405 });
+          }
           const completedSession = await this.completeSession();
           return new Response(JSON.stringify({ success: true, session: completedSession }), {
             headers: { "Content-Type": "application/json" }
           });
 
-        case "/cancel":
-          const cancelledSession = await this.cancelSession();
-          return new Response(JSON.stringify({ success: true, session: cancelledSession }), {
-            headers: { "Content-Type": "application/json" }
-          });
-
         case "/transcript":
-          const transcript = await this.getTranscript();
-          return new Response(JSON.stringify({ success: true, ...transcript }), {
-            headers: { "Content-Type": "application/json" }
-          });
-
+           const transcriptData = await this.getTranscript();
+           return new Response(JSON.stringify({ success: true, ...transcriptData }), {
+             headers: { "Content-Type": "application/json" }
+           });
+           
         case "/summary":
-          const summary = await this.getSessionSummary();
-          return new Response(JSON.stringify({ success: true, ...summary }), {
-            headers: { "Content-Type": "application/json" }
-          });
+           const summaryData = await this.getTranscript();
+           return new Response(JSON.stringify(summaryData), {
+             headers: { "Content-Type": "application/json" }
+           });
+
+        case "/state":
+           if (!this.session) {
+             return new Response(JSON.stringify({ success: false, error: "No session found" }), { status: 404, headers: { "Content-Type": "application/json" } });
+           }
+           return new Response(JSON.stringify({ success: true, session: this.session }), {
+             headers: { "Content-Type": "application/json" }
+           });
+
+        case "/update-state":
+           if (request.method !== "POST") {
+             return new Response("Method Not Allowed", { status: 405 });
+           }
+           const { session: updatedSession } = await request.json() as any;
+           if (updatedSession) {
+             this.session = updatedSession;
+             await this.saveSession();
+           }
+           return new Response(JSON.stringify({ success: true, session: this.session }), {
+             headers: { "Content-Type": "application/json" }
+           });
+
+        case "/question/current":
+           const currentQ = await this.getCurrentQuestion();
+           return new Response(JSON.stringify({ success: true, question: currentQ, session: this.session }), {
+             headers: { "Content-Type": "application/json" }
+           });
+
+        case "/add-interaction":
+           if (request.method !== "POST") {
+             return new Response("Method Not Allowed", { status: 405 });
+           }
+           const { userText, aiText } = await request.json() as any;
+           
+           // Store AI response
+           if (aiText && this.session) {
+             this.session.aiResponses.push({
+               responseId: crypto.randomUUID(),
+               sessionId: this.session.sessionId,
+               type: AIResponseType.ENCOURAGEMENT, // Defaulting to encouragement/chat
+               content: aiText,
+               generatedAt: new Date().toISOString(),
+               sentiment: Sentiment.NEUTRAL,
+               followUp: false,
+               responseTime: 0,
+               confidence: 1
+             });
+             await this.saveSession();
+           }
+           
+           return new Response(JSON.stringify({ success: true }), {
+             headers: { "Content-Type": "application/json" }
+           });
 
         default:
           return new Response("Not Found", { status: 404 });
       }
     } catch (error) {
-      return new Response(JSON.stringify({ 
-        success: false, 
-        error: { 
+      console.error("DO: Error handling request:", error);
+      return new Response(JSON.stringify({
+        success: false,
+        error: {
           message: error instanceof Error ? error.message : "Unknown error",
           timestamp: new Date().toISOString()
-        } 
+        }
       }), {
         status: 500,
         headers: { "Content-Type": "application/json" }
@@ -471,7 +552,6 @@ export class InterviewSessionDO {
   }
 }
 
-// Session Manager for creating and managing Durable Object instances
 export class SessionManager {
   private sessionNamespace: DurableObjectNamespace;
 
@@ -489,15 +569,17 @@ export class SessionManager {
   ): Promise<string> {
     const sessionId = crypto.randomUUID();
     const stub = this.sessionNamespace.get(this.sessionNamespace.idFromName(sessionId));
-    
-    const response = await stub.fetch("/start", {
+
+    // Use /start endpoint
+    const response = await stub.fetch("http://internal/start", {
       method: "POST",
       body: JSON.stringify({
         userId,
         mode,
         jobType,
         difficulty,
-        estimatedDuration
+        estimatedDuration,
+        sessionId // Add sessionId to the data
       }),
       headers: { "Content-Type": "application/json" }
     });
@@ -517,8 +599,8 @@ export class SessionManager {
   // Get session summary
   async getSessionSummary(sessionId: string): Promise<any> {
     const stub = this.getSessionStub(sessionId);
-    const response = await stub.fetch("/summary");
-    
+    const response = await stub.fetch("http://internal/summary");
+
     if (!response.ok) {
       throw new Error("Failed to get session summary");
     }
