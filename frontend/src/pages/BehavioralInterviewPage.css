@@ -1,0 +1,259 @@
+/* BehavioralInterviewPage.css - Cyber Brutalist Voice Edition */
+
+.interview-page.behavioral-mode {
+    background-color: var(--bg-primary);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    color: var(--text-primary);
+    font-family: 'Inter', sans-serif;
+    overflow: hidden;
+    position: relative;
+}
+
+/* Background Grid Effect */
+.interview-page.behavioral-mode::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: 
+        linear-gradient(rgba(204, 255, 0, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(204, 255, 0, 0.03) 1px, transparent 1px);
+    background-size: 50px 50px;
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* Header */
+.interview-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem 2rem;
+    border-bottom: 1px solid var(--border-color);
+    background: rgba(10, 10, 10, 0.8);
+    backdrop-filter: blur(10px);
+    z-index: 10;
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+.interview-mode-badge {
+    background: var(--primary-color);
+    color: var(--text-inverse);
+    padding: 0.25rem 0.75rem;
+    font-family: 'Space Mono', monospace;
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: 0.8rem;
+    letter-spacing: 1px;
+}
+
+.job-title-badge {
+    color: var(--text-secondary);
+    font-family: 'Space Mono', monospace;
+    font-size: 0.9rem;
+    border-left: 2px solid var(--primary-color);
+    padding-left: 1rem;
+}
+
+.interview-timer {
+    font-family: 'Space Mono', monospace;
+    color: var(--primary-color);
+    font-weight: 700;
+}
+
+.end-button {
+    background: transparent;
+    border: 1px solid var(--error-color);
+    color: var(--error-color);
+    padding: 0.5rem 1rem;
+    font-family: 'Space Mono', monospace;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.2s;
+}
+
+.end-button:hover {
+    background: var(--error-color);
+    color: white;
+}
+
+/* Main Content */
+.interview-content.centered-layout {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    max-width: 800px;
+    margin: 0 auto;
+    width: 100%;
+    z-index: 1;
+    gap: 4rem;
+}
+
+/* Avatar Section */
+.avatar-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2rem;
+    position: relative;
+}
+
+.avatar-circle {
+    width: 150px;
+    height: 150px;
+    border-radius: 50%;
+    background: var(--bg-secondary);
+    border: 2px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    transition: all 0.3s ease;
+    box-shadow: 0 0 0 0 rgba(204, 255, 0, 0);
+}
+
+.avatar-icon {
+    font-size: 4rem;
+    color: var(--text-secondary);
+    transition: all 0.3s ease;
+}
+
+/* Speaking State */
+.avatar-circle.speaking {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 30px rgba(204, 255, 0, 0.2);
+}
+
+.avatar-circle.speaking .avatar-icon {
+    color: var(--primary-color);
+}
+
+/* Listening State */
+.avatar-circle.listening {
+    border-color: #00f0ff; /* Cyan for listening */
+    box-shadow: 0 0 30px rgba(0, 240, 255, 0.2);
+}
+
+.avatar-circle.listening .avatar-icon {
+    color: #00f0ff;
+}
+
+/* Pulse Animation */
+.pulse-ring {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    border: 2px solid var(--primary-color);
+    opacity: 0;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        width: 100%;
+        height: 100%;
+        opacity: 0.8;
+    }
+    100% {
+        width: 200%;
+        height: 200%;
+        opacity: 0;
+    }
+}
+
+.status-indicator {
+    font-family: 'Space Mono', monospace;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}
+
+/* Conversation Display */
+.conversation-display {
+    text-align: center;
+    width: 100%;
+}
+
+.current-question {
+    font-size: 1.75rem;
+    font-weight: 600;
+    line-height: 1.4;
+    margin-bottom: 2rem;
+    color: var(--text-primary);
+    min-height: 3.5rem; /* Prevent layout jump */
+}
+
+.transcript-preview {
+    min-height: 3rem;
+    color: var(--text-secondary);
+    font-style: italic;
+    font-size: 1.1rem;
+}
+
+/* Controls */
+.controls-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+}
+
+.mic-button {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    border: none;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font-size: 2rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    border: 2px solid var(--border-color);
+}
+
+.mic-button:hover {
+    background: var(--bg-tertiary);
+    transform: scale(1.05);
+}
+
+.mic-button.active {
+    background: #ef4444; /* Red for stop */
+    color: white;
+    border-color: #ef4444;
+    animation: breathe 2s infinite;
+}
+
+@keyframes breathe {
+    0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+    70% { box-shadow: 0 0 0 20px rgba(239, 68, 68, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+
+.mic-hint {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    opacity: 0.7;
+}

@@ -1,6 +1,6 @@
 // Interview Session Management Service using Durable Objects
 
-import { InterviewSession, InterviewQuestion, InterviewAnswer, AIResponse, InterviewMode, InterviewStatus, Difficulty, QuestionType, Sentiment, AIResponseType } from "../types";
+import { InterviewSession, InterviewQuestion, InterviewAnswer, AIResponse, InterviewMode, InterviewStatus, Difficulty, QuestionType, Sentiment, AIResponseType, ExperienceLevel } from "../types";
 import { InterviewSessionRepository } from "./interfaces";
 
 interface Env {
@@ -65,7 +65,10 @@ export class InterviewSessionDO {
     mode: InterviewMode,
     jobType: string,
     difficulty: Difficulty = Difficulty.MEDIUM,
-    estimatedDuration: number = 45
+    estimatedDuration: number = 45,
+    jobTitle?: string,
+    jobDescription?: string,
+    seniority?: string
   ): Promise<InterviewSession> {
     if (this.session && this.session.status === InterviewStatus.IN_PROGRESS) {
       throw new Error("Session already in progress");
@@ -114,7 +117,11 @@ export class InterviewSessionDO {
             const prompt = `
 You are an expert technical interviewer. 
 Job Role: ${jobType}
+${jobTitle ? `Job Title: ${jobTitle}` : ''}
+${seniority ? `Seniority Level: ${seniority}` : ''}
 Difficulty: ${difficulty}
+${jobDescription ? `Job Description Context: ${jobDescription.substring(0, 300)}...` : ''}
+
 Task: Select the most suitable coding problem from the list below for this interview.
 Rules:
 - Return ONLY the ID of the selected problem.
@@ -131,12 +138,16 @@ ${limitedPool.map((p: any) => `${p.id}: ${p.title} (${p.topics.join(', ')})`).jo
             console.log("DO: AI Response:", JSON.stringify(response));
 
             let responseText = "0";
-            if (response && typeof response.response === 'string') {
-              responseText = response.response.trim();
-            } else if (response && typeof response === 'string') {
-              responseText = response.trim();
-            } else if (response && response.result && typeof response.result.response === 'string') {
-              responseText = response.result.response.trim();
+            if (response) {
+              if (typeof response.response === 'string') {
+                responseText = response.response.trim();
+              } else if (typeof response.response === 'number') {
+                responseText = response.response.toString();
+              } else if (typeof response === 'string') {
+                responseText = response.trim();
+              } else if (response.result && typeof response.result.response === 'string') {
+                responseText = response.result.response.trim();
+              }
             }
 
             selectedId = responseText.replace(/['"]/g, '').trim();
@@ -206,6 +217,8 @@ ${limitedPool.map((p: any) => `${p.id}: ${p.title} (${p.topics.join(', ')})`).jo
       mode,
       jobType,
       difficulty,
+      jobDescription,
+      seniority: seniority as any,
       status: InterviewStatus.PENDING,
       createdAt: now,
       startedAt: null,
@@ -469,8 +482,8 @@ ${limitedPool.map((p: any) => `${p.id}: ${p.title} (${p.topics.join(', ')})`).jo
           if (request.method !== "POST") {
             return new Response("Method Not Allowed", { status: 405 });
           }
-          const { userId, mode, jobType, difficulty, estimatedDuration, sessionId } = await request.json() as any;
-          await this.startSession(userId, mode, jobType, difficulty, estimatedDuration);
+          const { userId, mode, jobType, difficulty, estimatedDuration, sessionId, jobTitle, jobDescription, seniority } = await request.json() as any;
+          await this.startSession(userId, mode, jobType, difficulty, estimatedDuration, jobTitle, jobDescription, seniority);
           if (sessionId) {
             this.session!.sessionId = sessionId;
             await this.saveSession();
@@ -594,13 +607,13 @@ export class SessionManager {
     return this.namespace.get(id);
   }
 
-  async createSession(userId: string, mode: InterviewMode, jobType: string, difficulty: Difficulty, estimatedDuration: number = 45): Promise<{ sessionId: string, session: InterviewSession }> {
+  async createSession(userId: string, mode: InterviewMode, jobType: string, difficulty: Difficulty, estimatedDuration: number = 45, jobTitle?: string, jobDescription?: string, seniority?: string): Promise<{ sessionId: string, session: InterviewSession }> {
     const sessionId = crypto.randomUUID();
     const stub = this.getSessionStub(sessionId);
     const response = await stub.fetch("http://internal/start", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId, mode, jobType, difficulty, estimatedDuration, sessionId })
+      body: JSON.stringify({ userId, mode, jobType, difficulty, estimatedDuration, sessionId, jobTitle, jobDescription, seniority })
     });
 
     if (!response.ok) {

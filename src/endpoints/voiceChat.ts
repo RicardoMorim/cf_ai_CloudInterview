@@ -68,6 +68,7 @@ export class VoiceChat extends OpenAPIRoute {
                 if (body.action === "greeting") {
                     // Generate Greeting
                     let context = "You are Alex, a senior technical recruiter at a top tech company. This is the start of the interview.";
+                    
                     if (currentQuestion) {
                         context += `\nThe first question will be: ${currentQuestion.title}.`;
                         context += "\nGoal: Introduce yourself briefly, welcome the candidate, and transition smoothly into the first question. Simulate a real interview.";
@@ -122,8 +123,12 @@ export class VoiceChat extends OpenAPIRoute {
                 const sessionState = await sessionStub.fetch("http://internal/state").then(r => r.json() as any);
                 const currentCode = sessionState.currentCode || "";
                 const interviewMode = sessionState.mode || "technical";
+                const jobDescription = sessionState.jobDescription || "";
+                const seniority = sessionState.seniority || "";
 
                 context += `\nInterview Mode: ${interviewMode.toUpperCase()}`;
+                if (seniority) context += `\nTarget Seniority: ${seniority}`;
+                if (jobDescription) context += `\nJob Description Context: ${jobDescription.substring(0, 300)}...`;
 
                 if (currentQuestion) {
                     context += `\nCurrent Question: ${currentQuestion.title}\n${currentQuestion.text}`;

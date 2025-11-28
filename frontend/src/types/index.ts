@@ -43,6 +43,14 @@ export enum ProgrammingLanguage {
     RUST = "rust"
 }
 
+export enum ExperienceLevel {
+    JUNIOR = "junior",
+    MID = "mid",
+    SENIOR = "senior",
+    LEAD = "lead",
+    PRINCIPAL = "principal"
+}
+
 export interface InterviewQuestion {
     questionId: string;
     type: QuestionType;
@@ -96,6 +104,9 @@ export interface InterviewSession {
     questions: InterviewQuestion[];
     answers: InterviewAnswer[];
     aiResponses: AIResponse[];
+    jobTitle?: string;
+    jobDescription?: string;
+    seniority?: ExperienceLevel;
 }
 
 export interface CreateSessionRequest {
@@ -106,4 +117,7 @@ export interface CreateSessionRequest {
     language?: ProgrammingLanguage;
     includeCoding?: boolean;
     topics?: string[];
+    jobDescription?: string;
+    seniority?: ExperienceLevel;
+    jobTitle?: string;
 }

@@ -11,10 +11,10 @@ declare global {
   interface Env {
     // Cloudflare Workers AI binding
     AI: Ai;
-    
+
     // Cloudflare KV namespace binding
     KV: KVNamespace;
-    
+
     // Durable Object namespace for interview sessions
     SESSION_NAMESPACE: DurableObjectNamespace;
   }
@@ -298,6 +298,8 @@ export interface InterviewSession {
   userId: string;
   mode: InterviewMode;
   jobType: string;
+  jobDescription?: string;
+  seniority?: ExperienceLevel;
   difficulty: Difficulty;
   status: InterviewStatus;
   createdAt: string;
@@ -334,6 +336,8 @@ export interface CreateSessionRequest {
   language?: ProgrammingLanguage;
   includeCoding?: boolean;
   topics?: string[];
+  jobDescription?: string;
+  seniority?: ExperienceLevel;
 }
 
 export interface SubmitAnswerRequest {

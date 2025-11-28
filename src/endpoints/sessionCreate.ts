@@ -22,7 +22,9 @@ export class SessionCreate extends OpenAPIRoute {
 							duration: z.number().optional().default(45),
 							language: z.string().optional().default("javascript"),
 							includeCoding: z.boolean().optional().default(true),
-							topics: z.array(z.string()).optional().default([])
+							topics: z.array(z.string()).optional().default([]),
+							jobDescription: z.string().optional(),
+							seniority: z.enum(["junior", "mid", "senior", "lead", "principal"]).optional()
 						})
 					}
 				}
@@ -35,21 +37,7 @@ export class SessionCreate extends OpenAPIRoute {
 					"application/json": {
 						schema: z.object({
 							success: z.boolean(),
-							session: z.object({
-								sessionId: z.string(),
-								mode: z.string(),
-								jobType: z.string(),
-								difficulty: z.string(),
-								status: z.string(),
-								createdAt: z.string(),
-								estimatedDuration: z.number(),
-								questionCount: z.number(),
-								aiInterviewer: z.object({
-									name: z.string(),
-									personality: z.string(),
-									experience: z.string()
-								})
-							}),
+							session: z.any(), // Allow full session object including questions
 							nextAction: z.object({
 								type: z.string(),
 								message: z.string(),
@@ -81,7 +69,7 @@ export class SessionCreate extends OpenAPIRoute {
 	async handle(c: AppContext) {
 		// Get validated data
 		const data = await this.getValidatedData<typeof this.schema>();
-		const { mode, jobType, difficulty, duration, language, includeCoding, topics } = data.body;
+		const { mode, jobType, difficulty, duration, language, includeCoding, topics, jobDescription, seniority } = data.body;
 
 		// Get KV binding
 		const { SESSION_NAMESPACE } = c.env as any;
@@ -95,12 +83,14 @@ export class SessionCreate extends OpenAPIRoute {
 			const sessionManager = new SessionManager(SESSION_NAMESPACE);
 
 			console.log("SessionCreate: Calling createSession");
-			const { sessionId } = await sessionManager.createSession(
+			const { sessionId, session } = await sessionManager.createSession(
 				userId,
 				mode as any,
 				jobType,
 				difficulty as any,
-				duration
+				duration,
+				jobDescription,
+				seniority as any
 			);
 			console.log("SessionCreate: Session created with ID:", sessionId);
 
@@ -110,21 +100,7 @@ export class SessionCreate extends OpenAPIRoute {
 
 			return {
 				success: true,
-				session: {
-					sessionId,
-					mode,
-					jobType,
-					difficulty,
-					status: "active",
-					createdAt: new Date().toISOString(),
-					estimatedDuration: duration,
-					questionCount: 6, // TODO: Calculate based on mode and duration
-					aiInterviewer: {
-						name: "Alex",
-						personality: "professional",
-						experience: "10 years as engineering manager"
-					}
-				},
+				session: session,
 				nextAction: {
 					type: "intro",
 					message: introduction,

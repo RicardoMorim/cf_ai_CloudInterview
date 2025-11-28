@@ -1,24 +1,40 @@
-import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useInterview } from '../contexts/InterviewContext';
-import { InterviewMode, Difficulty } from '../types';
-import { FiCode, FiCpu } from 'react-icons/fi';
+import { InterviewMode, Difficulty, ExperienceLevel } from '../types';
+import { FiCode, FiCpu, FiBriefcase, FiUser, FiLayers } from 'react-icons/fi';
 import './HomePage.css';
 
 const HomePage: React.FC = () => {
     const { startInterview, loading } = useInterview();
     const navigate = useNavigate();
 
-    const handleStartInterview = async (mode: InterviewMode) => {
+    const [jobTitle, setJobTitle] = useState('');
+    const [jobType, setJobType] = useState('Frontend Developer');
+    const [seniority, setSeniority] = useState<ExperienceLevel>(ExperienceLevel.MID);
+    const [mode, setMode] = useState<InterviewMode>(InterviewMode.TECHNICAL);
+    const [jobDescription, setJobDescription] = useState('');
+
+    const handleStartInterview = async (e: React.FormEvent) => {
+        e.preventDefault();
         try {
             await startInterview({
                 mode,
-                jobType: 'Frontend Developer', // Default for now
-                difficulty: Difficulty.MEDIUM
+                jobType,
+                jobTitle,
+                jobDescription,
+                seniority,
+                difficulty: Difficulty.MEDIUM // Default, could be added to form
             });
-            navigate('/interview');
+
+            if (mode === InterviewMode.BEHAVIORAL) {
+                navigate('/interview/behavioral');
+            } else {
+                navigate('/interview');
+            }
         } catch (error) {
             console.error('Failed to start session:', error);
+            alert('Failed to start session. Please try again.');
         }
     };
 
@@ -31,70 +47,88 @@ const HomePage: React.FC = () => {
                             Master Your <span className="gradient-text">Tech Interview</span>
                         </h1>
                         <p className="hero-subtitle">
-                            Practice with our AI-powered interviewer. Get real-time feedback on your coding skills and behavioral answers.
+                            Practice with our AI-powered interviewer. Tailored to your specific role and seniority.
                         </p>
-
-                        <div className="cta-actions">
-                            <button
-                                className="cta-button primary"
-                                onClick={() => handleStartInterview(InterviewMode.TECHNICAL)}
-                                disabled={loading}
-                            >
-                                Start Technical
-                            </button>
-                            <button
-                                className="cta-button secondary"
-                                onClick={() => handleStartInterview(InterviewMode.BEHAVIORAL)}
-                                disabled={loading}
-                            >
-                                Start Behavioral
-                            </button>
-                        </div>
                     </div>
-                </div>
-            </section>
 
-            <section className="features">
-                <div className="features-content">
-                    <div className="section-header">
-                        <h2 className="section-title">Choose Your Interview Mode</h2>
-                    </div>
-                    <div className="features-grid">
-                        <div className="feature-card">
-                            <div className="feature-icon-container">
-                                <div className="feature-icon-bg">
-                                    {React.createElement(FiCode as any, { className: "feature-icon-svg", style: { stroke: 'var(--primary-color)' } })}
+                    <div className="setup-card">
+                        <h2>Configure Your Interview</h2>
+                        <form onSubmit={handleStartInterview} className="setup-form">
+                            <div className="form-group">
+                                <label><FiBriefcase /> Job Title</label>
+                                <input
+                                    type="text"
+                                    placeholder="e.g. Senior React Developer"
+                                    value={jobTitle}
+                                    onChange={(e) => setJobTitle(e.target.value)}
+                                    required
+                                />
+                            </div>
+
+                            <div className="form-row">
+                                <div className="form-group">
+                                    <label><FiLayers /> Position Type</label>
+                                    <select value={jobType} onChange={(e) => setJobType(e.target.value)}>
+                                        <option value="Frontend Developer">Frontend Developer</option>
+                                        <option value="Backend Developer">Backend Developer</option>
+                                        <option value="Fullstack Developer">Fullstack Developer</option>
+                                        <option value="DevOps Engineer">DevOps Engineer</option>
+                                        <option value="Mobile Developer">Mobile Developer</option>
+                                        <option value="Data Scientist">Data Scientist</option>
+                                        <option value="Product Manager">Product Manager</option>
+                                    </select>
+                                </div>
+
+                                <div className="form-group">
+                                    <label><FiUser /> Seniority</label>
+                                    <select value={seniority} onChange={(e) => setSeniority(e.target.value as ExperienceLevel)}>
+                                        <option value={ExperienceLevel.JUNIOR}>Junior</option>
+                                        <option value={ExperienceLevel.MID}>Mid-Level</option>
+                                        <option value={ExperienceLevel.SENIOR}>Senior</option>
+                                        <option value={ExperienceLevel.LEAD}>Lead</option>
+                                        <option value={ExperienceLevel.PRINCIPAL}>Principal</option>
+                                    </select>
                                 </div>
                             </div>
-                            <h3 className="feature-title">Technical Interview</h3>
-                            <p className="feature-description">Practice coding problems, system design, and technical concepts.</p>
-                            <button
-                                className="button primary small"
-                                onClick={() => handleStartInterview(InterviewMode.TECHNICAL)}
-                                disabled={loading}
-                                style={{ marginTop: '1rem' }}
-                            >
-                                Start Technical
-                            </button>
-                        </div>
 
-                        <div className="feature-card">
-                            <div className="feature-icon-container">
-                                <div className="feature-icon-bg">
-                                    {React.createElement(FiCpu as any, { className: "feature-icon-svg", style: { stroke: 'var(--secondary-color)' } })}
+                            <div className="form-group">
+                                <label>Job Description (Optional)</label>
+                                <textarea
+                                    placeholder="Paste the job description here for better context..."
+                                    value={jobDescription}
+                                    onChange={(e) => setJobDescription(e.target.value)}
+                                    rows={3}
+                                />
+                            </div>
+
+                            <div className="mode-selection">
+                                <label>Interview Mode</label>
+                                <div className="mode-options">
+                                    <div
+                                        className={`mode-option ${mode === InterviewMode.TECHNICAL ? 'selected' : ''}`}
+                                        onClick={() => setMode(InterviewMode.TECHNICAL)}
+                                    >
+                                        <FiCode />
+                                        <span>Technical</span>
+                                    </div>
+                                    <div
+                                        className={`mode-option ${mode === InterviewMode.BEHAVIORAL ? 'selected' : ''}`}
+                                        onClick={() => setMode(InterviewMode.BEHAVIORAL)}
+                                    >
+                                        <FiCpu />
+                                        <span>Behavioral</span>
+                                    </div>
                                 </div>
                             </div>
-                            <h3 className="feature-title">Behavioral Interview</h3>
-                            <p className="feature-description">Master STAR method answers and soft skill questions.</p>
+
                             <button
-                                className="button primary small"
-                                onClick={() => handleStartInterview(InterviewMode.BEHAVIORAL)}
+                                type="submit"
+                                className="cta-button primary full-width"
                                 disabled={loading}
-                                style={{ marginTop: '1rem' }}
                             >
-                                Start Behavioral
+                                {loading ? 'Starting Session...' : 'Start Interview'}
                             </button>
-                        </div>
+                        </form>
                     </div>
                 </div>
             </section>
