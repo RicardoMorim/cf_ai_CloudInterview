@@ -1,13 +1,160 @@
-body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+/* Global Styles & Variables - Cyber Brutalism */
+
+@import url('https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Inter:wght@400;700;900&display=swap');
+
+:root {
+  /* Default Dark Mode (Cyber Brutalist) */
+  --primary-color: #ccff00; /* Acid Green */
+  --primary-hover: #b3e600;
+  --secondary-color: #ffffff;
+  --accent-color: #ff00ff;
+  --error-color: #ff3333;
+  --success-color: #00ff66;
+  
+  --bg-primary: #000000;
+  --bg-secondary: #111111;
+  --bg-glass: #000000;
+  --bg-glass-dark: #1a1a1a;
+  
+  --text-primary: #ffffff;
+  --text-secondary: #cccccc;
+  --text-inverse: #000000;
+  
+  --border-color: #333333;
+  --border-glow: #ccff00;
+  
+  --shadow-light: 4px 4px 0px rgba(255, 255, 255, 0.2);
+  --shadow-medium: 6px 6px 0px var(--primary-color);
+  --shadow-heavy: 8px 8px 0px var(--primary-color);
+  
+  --transition-fast: 0.1s steps(2);
+  --transition-normal: 0.2s ease-out;
+  --transition-spring: 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+/* Light Mode Overrides */
+.light {
+  --primary-color: #6600cc; /* Deep Purple for contrast against white, or keep Acid Green with black text? Let's go bold black/white/green */
+  --primary-color: #000000; /* Primary action is Black in light mode */
+  --primary-hover: #333333;
+  
+  --bg-primary: #ffffff;
+  --bg-secondary: #f0f0f0;
+  --bg-glass: #ffffff;
+  --bg-glass-dark: #e0e0e0; /* Light grey for hover states */
+  
+  --text-primary: #000000;
+  --text-secondary: #444444;
+  --text-inverse: #ffffff;
+  
+  --border-color: #000000;
+  --border-glow: #000000;
+  
+  --shadow-light: 4px 4px 0px rgba(0, 0, 0, 0.2);
+  --shadow-medium: 6px 6px 0px #000000;
+  --shadow-heavy: 8px 8px 0px #000000;
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', sans-serif;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  overflow-x: hidden;
+  background-image: 
+    linear-gradient(rgba(128, 128, 128, 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(128, 128, 128, 0.1) 1px, transparent 1px);
+  background-size: 50px 50px;
+}
+
+code, pre, .mono {
+  font-family: 'Space Mono', monospace;
+}
+
+/* Global Button Styles */
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem 2rem;
+  border-radius: 0;
+  font-weight: 700;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  border: 2px solid transparent;
+  gap: 0.5rem;
+  text-decoration: none;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-family: 'Space Mono', monospace;
+  position: relative;
+}
+
+.button:active {
+  transform: translate(2px, 2px);
+  box-shadow: 2px 2px 0px var(--text-primary) !important;
+}
+
+.button.primary {
+  background: var(--primary-color);
+  color: var(--text-inverse);
+  border: 2px solid var(--primary-color);
+  box-shadow: 4px 4px 0px var(--text-primary);
+}
+
+/* In light mode, primary button is black with white text */
+.light .button.primary {
+    background: #000000;
+    color: #ffffff;
+    border-color: #000000;
+    box-shadow: 4px 4px 0px #888888;
+}
+
+.button.primary:hover:not(:disabled) {
+  transform: translate(-2px, -2px);
+  box-shadow: 6px 6px 0px var(--text-primary);
+  background: var(--primary-hover);
+}
+
+.button.secondary {
+  background: transparent;
+  border: 2px solid var(--text-primary);
+  color: var(--text-primary);
+  box-shadow: 4px 4px 0px var(--text-primary);
+}
+
+.button.secondary:hover:not(:disabled) {
+  background: var(--text-primary);
+  color: var(--text-inverse);
+  transform: translate(-2px, -2px);
+  box-shadow: 6px 6px 0px var(--primary-color);
+}
+
+.button.small {
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  box-shadow: 3px 3px 0px var(--text-primary);
+}
+
+.button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  filter: grayscale(1);
+  box-shadow: none;
+  transform: none;
+}
+
+/* Utilities */
+.glass-panel {
+  background: var(--bg-primary);
+  border: 2px solid var(--border-color);
+  box-shadow: 8px 8px 0px rgba(128, 128, 128, 0.2);
+}
+
+.text-gradient {
+  color: var(--primary-color);
+  background: none;
+  -webkit-text-fill-color: initial;
+  text-shadow: 2px 2px 0px rgba(128, 128, 128, 0.2);
 }

@@ -2,7 +2,8 @@
 
 .interview-page {
   height: 100%;
-  background-color: var(--bg-primary);
+  /* Transparent to show body gradient */
+  background-color: transparent;
 }
 
 .interview-container {
@@ -17,8 +18,12 @@
   justify-content: space-between;
   align-items: center;
   padding: 1.5rem 0;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border-glow);
   margin-bottom: 2rem;
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  padding: 1.5rem;
+  border-radius: var(--border-radius-lg);
 }
 
 .interview-info h1 {
@@ -46,21 +51,25 @@
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  backdrop-filter: blur(5px);
 }
 
 .interview-mode {
   background-color: rgba(59, 130, 246, 0.1);
   color: var(--primary-color);
+  border: 1px solid rgba(59, 130, 246, 0.2);
 }
 
 .interview-job {
   background-color: rgba(100, 116, 139, 0.1);
   color: var(--secondary-color);
+  border: 1px solid rgba(100, 116, 139, 0.2);
 }
 
 .interview-difficulty {
   background-color: rgba(245, 158, 11, 0.1);
   color: var(--warning-color);
+  border: 1px solid rgba(245, 158, 11, 0.2);
 }
 
 .interview-timer {
@@ -68,7 +77,8 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.75rem 1rem;
-  background-color: var(--bg-tertiary);
+  background-color: var(--bg-glass);
+  border: 1px solid var(--border-glow);
   border-radius: var(--border-radius-md);
   font-weight: 600;
   font-size: 1.125rem;
@@ -86,10 +96,18 @@
 
 /* Question Section */
 .question-section {
-  background-color: var(--bg-primary);
-  border: 1px solid var(--border-color);
+  background: var(--bg-glass);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--border-glow);
   border-radius: var(--border-radius-lg);
   padding: 2rem;
+  box-shadow: var(--shadow-medium);
+  transition: all var(--transition-normal);
+}
+
+.question-section:hover {
+  box-shadow: var(--shadow-glow);
+  border-color: var(--primary-color);
 }
 
 .question-header {
@@ -107,13 +125,14 @@
 
 .question-type {
   padding: 0.375rem 0.75rem;
-  background-color: var(--primary-color);
+  background: linear-gradient(135deg, var(--primary-color), var(--primary-hover));
   color: white;
   border-radius: var(--border-radius-md);
   font-size: 0.75rem;
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  box-shadow: var(--shadow-light);
 }
 
 .question-content h4 {
@@ -142,22 +161,27 @@
 }
 
 .question-hints li {
-  padding: 0.5rem;
-  background-color: var(--bg-tertiary);
+  padding: 0.75rem;
+  background-color: var(--bg-glass-dark);
   border-radius: var(--border-radius-md);
   margin-bottom: 0.5rem;
   color: var(--text-secondary);
+  border-left: 3px solid var(--accent-color);
 }
 
 /* Session History */
 .session-history {
-  background-color: var(--bg-primary);
-  border: 1px solid var(--border-color);
+  background: var(--bg-glass);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--border-glow);
   border-radius: var(--border-radius-lg);
   padding: 2rem;
   height: fit-content;
+  max-height: 80vh;
+  overflow-y: auto;
   position: sticky;
   top: 2rem;
+  box-shadow: var(--shadow-medium);
 }
 
 .session-history h3 {
@@ -186,7 +210,7 @@
   top: 2rem;
   bottom: -2rem;
   width: 2px;
-  background-color: var(--border-color);
+  background-color: var(--border-glow);
 }
 
 .timeline-item:last-child::before {
@@ -197,9 +221,10 @@
   width: 2rem;
   height: 2rem;
   border-radius: 50%;
-  background-color: var(--primary-color);
+  background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
   position: relative;
   z-index: 1;
+  box-shadow: 0 0 10px rgba(102, 126, 234, 0.5);
 }
 
 .timeline-content {
@@ -212,7 +237,7 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--primary-color);
+  color: var(--accent-color);
   margin-bottom: 0.25rem;
 }
 
@@ -230,11 +255,13 @@
 /* Answer Section */
 .answer-section {
   grid-column: 1;
-  background-color: var(--bg-primary);
-  border: 1px solid var(--border-color);
+  background: var(--bg-glass);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--border-glow);
   border-radius: var(--border-radius-lg);
   padding: 2rem;
   margin-top: 2rem;
+  box-shadow: var(--shadow-medium);
 }
 
 .answer-section h3 {
@@ -257,16 +284,18 @@
   font-size: 1rem;
   line-height: 1.5;
   padding: 1rem;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--border-glow);
   border-radius: var(--border-radius-md);
-  background-color: var(--bg-primary);
+  background-color: var(--bg-glass-dark);
   color: var(--text-primary);
+  transition: all var(--transition-fast);
 }
 
 .answer-input textarea:focus {
   outline: none;
   border-color: var(--primary-color);
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  background-color: rgba(0, 0, 0, 0.2);
 }
 
 /* Code Editor */
@@ -282,40 +311,35 @@
 }
 
 .editor-header select {
-  padding: 0.5rem;
-  border: 1px solid var(--border-color);
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--border-glow);
   border-radius: var(--border-radius-md);
-  background-color: var(--bg-primary);
+  background-color: var(--bg-glass-dark);
   color: var(--text-primary);
+  cursor: pointer;
 }
 
 .run-code {
   padding: 0.5rem 1rem;
-  background-color: var(--success-color);
+  background: linear-gradient(135deg, var(--success-color), #059669);
   color: white;
   border: none;
   border-radius: var(--border-radius-md);
   font-weight: 500;
   cursor: pointer;
-  transition: background-color var(--transition-fast);
+  transition: all var(--transition-fast);
+  box-shadow: var(--shadow-light);
 }
 
 .run-code:hover {
-  background-color: #059669;
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-glow);
 }
 
-.code-textarea {
-  width: 100%;
-  min-height: 12rem;
-  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-  font-size: 0.875rem;
-  line-height: 1.5;
-  padding: 1rem;
-  border: 1px solid var(--border-color);
-  border-radius: var(--border-radius-md);
-  background-color: var(--bg-tertiary);
-  color: var(--text-primary);
-  resize: vertical;
+.run-code:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
 }
 
 /* Answer Actions */
@@ -335,10 +359,10 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.75rem 1rem;
-  background-color: var(--bg-tertiary);
-  border: 1px solid var(--border-color);
-  border-radius: var(--border-radius-md);
+  padding: 0.75rem 1.5rem;
+  background-color: var(--bg-glass-dark);
+  border: 1px solid var(--border-glow);
+  border-radius: var(--border-radius-full);
   color: var(--text-primary);
   cursor: pointer;
   transition: all var(--transition-fast);
@@ -346,19 +370,21 @@
 }
 
 .voice-button:hover:not(:disabled) {
-  background-color: var(--border-color);
+  background-color: rgba(255, 255, 255, 0.1);
+  border-color: var(--primary-color);
 }
 
 .voice-button.recording {
-  background-color: var(--error-color);
+  background: linear-gradient(135deg, var(--error-color), #dc2626);
   color: white;
+  border-color: transparent;
   animation: pulse 1.5s infinite;
 }
 
 @keyframes pulse {
-  0% { opacity: 1; }
-  50% { opacity: 0.7; }
-  100% { opacity: 1; }
+  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+  70% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
 }
 
 .voice-button:disabled {
@@ -382,6 +408,11 @@
 .interview-inactive-content {
   text-align: center;
   max-width: 500px;
+  background: var(--bg-glass);
+  padding: 3rem;
+  border-radius: var(--border-radius-lg);
+  border: 1px solid var(--border-glow);
+  backdrop-filter: blur(20px);
 }
 
 .interview-inactive-content h2 {
@@ -409,6 +440,7 @@
     margin-top: 2rem;
     position: relative;
     top: auto;
+    max-height: none;
   }
 }
 
@@ -444,4 +476,45 @@
   .submit-actions {
     flex-direction: column;
   }
+}
+
+/* Monaco Editor & Console */
+.monaco-wrapper {
+  border: 1px solid var(--border-glow);
+  border-radius: var(--border-radius-md);
+  overflow: hidden;
+  margin-bottom: 1rem;
+  box-shadow: var(--shadow-light);
+}
+
+.console-output {
+  background-color: #1e1e1e;
+  border-radius: var(--border-radius-md);
+  padding: 1rem;
+  margin-top: 1rem;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 0.875rem;
+  color: #d4d4d4;
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid var(--border-color);
+}
+
+.console-output.error {
+  border-left: 4px solid var(--error-color);
+  background-color: rgba(239, 68, 68, 0.1);
+}
+
+.console-header {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  color: #858585;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+}
+
+.console-output pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-all;
 }

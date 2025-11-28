@@ -1,52 +1,6 @@
 /* App.css - Beautiful Modern Design */
 
-/* CSS Variables - Vibrant Modern Theme */
-:root {
-  --primary-color: #667eea;
-  --primary-hover: #764ba2;
-  --secondary-color: #f093fb;
-  --accent-color: #4facfe;
-  --success-color: #4ade80;
-  --warning-color: #fbbf24;
-  --error-color: #ef4444;
-  --text-primary: #1a202c;
-  --text-secondary: #4a5568;
-  --text-light: #ffffff;
-  --bg-primary: #ffffff;
-  --bg-secondary: #f7fafc;
-  --bg-glass: rgba(255, 255, 255, 0.1);
-  --bg-glass-dark: rgba(26, 32, 44, 0.3);
-  --border-color: #e2e8f0;
-  --border-glow: rgba(102, 126, 234, 0.3);
-  --shadow-light: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-  --shadow-medium: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-  --shadow-heavy: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
-  --shadow-glow: 0 0 20px rgba(102, 126, 234, 0.3);
-  --border-radius-sm: 8px;
-  --border-radius-md: 16px;
-  --border-radius-lg: 24px;
-  --border-radius-full: 50%;
-  --transition-fast: 0.2s ease;
-  --transition-normal: 0.3s ease;
-  --transition-spring: 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* Dark Theme Variables */
-[data-theme="dark"] {
-  --text-primary: #f7fafc;
-  --text-secondary: #cbd5e1;
-  --text-light: #1a202c;
-  --bg-primary: #0f172a;
-  --bg-secondary: #1a202c;
-  --bg-glass: rgba(15, 23, 42, 0.3);
-  --bg-glass-dark: rgba(255, 255, 255, 0.1);
-  --border-color: #2d3748;
-  --border-glow: rgba(102, 126, 234, 0.5);
-  --shadow-light: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
-  --shadow-medium: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
-  --shadow-heavy: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
-  --shadow-glow: 0 0 20px rgba(102, 126, 234, 0.5);
-}
+/* CSS Variables moved to index.css */
 
 /* Base Styles with Beautiful Typography */
 * {
