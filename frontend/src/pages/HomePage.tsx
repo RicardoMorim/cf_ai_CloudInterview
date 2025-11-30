@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useInterview } from '../contexts/InterviewContext';
 import { InterviewMode, Difficulty, ExperienceLevel } from '../types';
-import { FiCode, FiCpu, FiBriefcase, FiUser, FiLayers } from 'react-icons/fi';
+import { FiCode, FiCpu, FiBriefcase, FiUser, FiLayers, FiActivity } from 'react-icons/fi';
 import './HomePage.css';
 
 const HomePage: React.FC = () => {
@@ -12,8 +12,30 @@ const HomePage: React.FC = () => {
     const [jobTitle, setJobTitle] = useState('');
     const [jobType, setJobType] = useState('Frontend Developer');
     const [seniority, setSeniority] = useState<ExperienceLevel>(ExperienceLevel.MID);
+    const [difficulty, setDifficulty] = useState<Difficulty>(Difficulty.MEDIUM);
     const [mode, setMode] = useState<InterviewMode>(InterviewMode.TECHNICAL);
     const [jobDescription, setJobDescription] = useState('');
+
+    // Smart default: Update difficulty based on seniority
+    useEffect(() => {
+        switch (seniority) {
+            case ExperienceLevel.JUNIOR:
+                setDifficulty(Difficulty.EASY);
+                break;
+            case ExperienceLevel.MID:
+                setDifficulty(Difficulty.MEDIUM);
+                break;
+            case ExperienceLevel.SENIOR:
+            case ExperienceLevel.LEAD:
+                setDifficulty(Difficulty.HARD);
+                break;
+            case ExperienceLevel.PRINCIPAL:
+                setDifficulty(Difficulty.EXPERT);
+                break;
+            default:
+                setDifficulty(Difficulty.MEDIUM);
+        }
+    }, [seniority]);
 
     const handleStartInterview = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -24,7 +46,7 @@ const HomePage: React.FC = () => {
                 jobTitle,
                 jobDescription,
                 seniority,
-                difficulty: Difficulty.MEDIUM // Default, could be added to form
+                difficulty
             });
 
             if (mode === InterviewMode.BEHAVIORAL) {
@@ -89,6 +111,16 @@ const HomePage: React.FC = () => {
                                         <option value={ExperienceLevel.PRINCIPAL}>Principal</option>
                                     </select>
                                 </div>
+                            </div>
+
+                            <div className="form-group">
+                                <label><FiActivity /> Difficulty</label>
+                                <select value={difficulty} onChange={(e) => setDifficulty(e.target.value as Difficulty)}>
+                                    <option value={Difficulty.EASY}>Easy</option>
+                                    <option value={Difficulty.MEDIUM}>Medium</option>
+                                    <option value={Difficulty.HARD}>Hard</option>
+                                    <option value={Difficulty.EXPERT}>Expert</option>
+                                </select>
                             </div>
 
                             <div className="form-group">
