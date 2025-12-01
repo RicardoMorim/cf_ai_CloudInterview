@@ -98,6 +98,37 @@ export enum Sentiment {
 }
 
 // Value Objects
+interface SimilarQuestion {
+  title: string;
+  titleSlug: string;
+  difficulty: string;
+  translatedTitle: string | null;
+}
+
+interface Metadata {
+  category: string;
+  topics: string[];
+  hints: string[];
+  acceptance_rate: number;
+  likes: number;
+  dislikes: number;
+  similar_questions: SimilarQuestion[];
+}
+
+export interface LeetCodeProblem {
+  id: number;
+  difficulty: string;
+  title: string;
+  titleSlug: string;
+  url: string;
+  description: string;
+  solution_code_python: string;
+  solution_code_java: string;
+  solution_code_cpp: string;
+  metadata: Metadata;
+}
+
+
 export interface Problem {
   difficulty: Difficulty;
   questionId: string;

@@ -1,6 +1,6 @@
 // Interview Session Management Service using Durable Objects
 
-import { InterviewSession, InterviewQuestion, InterviewAnswer, AIResponse, InterviewMode, InterviewStatus, Difficulty, QuestionType, Sentiment, AIResponseType, ExperienceLevel, Essentials } from "../types";
+import { InterviewSession, InterviewQuestion, InterviewAnswer, AIResponse, InterviewMode, InterviewStatus, Difficulty, QuestionType, Sentiment, AIResponseType, ExperienceLevel, Essentials, Problem, LeetCodeProblem } from "../types";
 import { InterviewSessionRepository } from "./interfaces";
 
 interface Env {
@@ -80,13 +80,9 @@ export class InterviewSessionDO {
     if (mode === InterviewMode.TECHNICAL) {
       try {
         // 1. Fetch essentials list from KV
-        const keys = await this.env.KV.list();
-        console.log('Available keys:', keys);
+        // const keys = await this.env.KV.list(); // unused
 
-        console.log('Data:', await this.env.KV.get("essentials", { type: "json" }));
         var essentialsData: Essentials = await this.env.KV.get("essentials", { type: "json" });
-
-        console.log("DO: KV essentials:", essentialsData);
 
         // Fallback to local data if KV is empty
         if (!essentialsData || !essentialsData.problems) {
@@ -134,7 +130,7 @@ Rules:
 - Do not add any explanation or text, just the ID.
 
 Problems:
-${limitedPool.map((p: any) => `${p.id}: ${p.title} (${p.topics.join(', ')})`).join('\n')}
+${limitedPool.map((p: any) => `${p.questionId}: ${p.title} (${p.topics.join(', ')})`).join('\n')}
 `;
             const response = await this.env.AI.run("@cf/meta/llama-3.3-70b-instruct-fp8-fast", {
               messages: [{ role: "user", content: prompt }]
@@ -167,42 +163,32 @@ ${limitedPool.map((p: any) => `${p.id}: ${p.title} (${p.topics.join(', ')})`).jo
 
           if (selectedId !== "0") {
             // 4. Fetch full details
-            let fullProblem = await this.state.storage.get(`problem:${selectedId}`) as any;
-
-            if (!fullProblem) {
-              fullProblem = await this.env.KV.get(`problem:${selectedId}`, { type: "json" }) as any;
-            }
-
-            if (!fullProblem) {
-              const { TECHNICAL_QUESTIONS } = await import("../data/questions");
-              fullProblem = TECHNICAL_QUESTIONS.find(q => q.questionId === selectedId);
-            }
+            var fullProblem = await this.env.KV.get(`problem:${selectedId}`, { type: "json" }) as LeetCodeProblem;
 
             if (fullProblem) {
-              const isAlreadyFormatted = fullProblem.questionId && fullProblem.text;
-
-              if (isAlreadyFormatted) {
-                selectedQuestions.push(fullProblem);
-              } else {
-                selectedQuestions.push({
-                  questionId: fullProblem.questionId.toString(),
-                  type: QuestionType.CODING,
-                  category: fullProblem.metadata?.category || "General",
-                  difficulty: fullProblem.difficulty as Difficulty,
-                  title: fullProblem.title,
-                  text: fullProblem.description,
-                  tags: fullProblem.metadata?.topics || [],
-                  estimatedTime: 20,
-                  followUpQuestions: [],
-                  hints: fullProblem.metadata?.hints || [],
-                  metadata: {
-                    difficultyWeight: 1,
-                    popularity: fullProblem.metadata?.likes || 0,
-                    lastUpdated: new Date().toISOString(),
-                    relatedQuestions: []
-                  }
-                });
-              }
+              console.log("DO: Full problem details:", fullProblem);
+              
+              // Map LeetCodeProblem to InterviewQuestion
+              const interviewQuestion: InterviewQuestion = {
+                questionId: fullProblem.id ? fullProblem.id.toString() : selectedId,
+                type: QuestionType.CODING,
+                category: fullProblem.metadata?.category || "Algorithms",
+                difficulty: (fullProblem.difficulty as Difficulty) || difficulty,
+                title: fullProblem.title,
+                text: fullProblem.description || fullProblem.title,
+                tags: fullProblem.metadata?.topics || [],
+                estimatedTime: 30,
+                followUpQuestions: [],
+                hints: fullProblem.metadata?.hints || [],
+                metadata: {
+                  difficultyWeight: 1,
+                  popularity: fullProblem.metadata?.likes || 0,
+                  lastUpdated: new Date().toISOString(),
+                  relatedQuestions: []
+                }
+              };
+              
+              selectedQuestions.push(interviewQuestion);
             }
           }
         }
