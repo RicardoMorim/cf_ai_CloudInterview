@@ -1,8 +1,6 @@
 import axios from 'axios';
 import { CreateSessionRequest, InterviewSession, InterviewQuestion, InterviewAnswer, AIResponse, Difficulty, QuestionType } from '../types';
-import { env } from 'process';
-
-export const API_BASE_URL = env.REACT_APP_API_URL;
+export const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8787';
 
 const api = axios.create({
     baseURL: API_BASE_URL,
