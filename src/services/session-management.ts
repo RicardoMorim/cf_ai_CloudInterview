@@ -1,4 +1,4 @@
-// Interview Session Management Service using Durable Objects
+﻿// Interview Session Management Service using Durable Objects
 
 import { InterviewSession, InterviewQuestion, InterviewAnswer, AIResponse, InterviewMode, InterviewStatus, Difficulty, QuestionType, Sentiment, AIResponseType, ExperienceLevel, Essentials, Problem, LeetCodeProblem } from "../types";
 import { InterviewSessionRepository } from "./interfaces";
@@ -167,7 +167,7 @@ ${limitedPool.map((p: any) => `${p.questionId}: ${p.title} (${p.topics.join(', '
 
             if (fullProblem) {
               console.log("DO: Full problem details:", fullProblem);
-              
+
               // Map LeetCodeProblem to InterviewQuestion
               const interviewQuestion: InterviewQuestion = {
                 questionId: fullProblem.id ? fullProblem.id.toString() : selectedId,
@@ -187,7 +187,7 @@ ${limitedPool.map((p: any) => `${p.questionId}: ${p.title} (${p.topics.join(', '
                   relatedQuestions: []
                 }
               };
-              
+
               selectedQuestions.push(interviewQuestion);
             }
           }
@@ -482,24 +482,60 @@ Return ONLY the JSON object with this structure:
     return this.session;
   }
 
-  // Handle post-interview chat
-  async chat(message: string): Promise<{ response: string; session: InterviewSession }> {
+  // Handle chat interactions (greeting, during interview, post-interview)
+  async chat(message: string, action?: string): Promise<{ response: string; session: InterviewSession }> {
     if (!this.session) {
       throw new Error("No session found");
     }
 
-    const context = `
-      You are a helpful AI assistant discussing the results of a technical interview with the candidate.
-      
-      Interview Context:
-      Job: ${this.session.jobType}
-      Difficulty: ${this.session.difficulty}
-      Feedback: ${JSON.stringify(this.session.feedback)}
-      
-      Candidate's Question: ${message}
-      
-      Answer the candidate's question helpfully and encouragingly. refer to specific parts of their performance if possible.
-    `;
+    let context = "";
+    const currentQ = this.session.questions[this.session.currentQuestionIndex];
+
+    if (action === 'greeting') {
+      context = `
+            You are an AI interviewer named Alex.
+            The candidate has just started the interview.
+            
+            Job Role: ${this.session.jobType}
+            Difficulty: ${this.session.difficulty}
+            
+            First Question Title: ${currentQ ? currentQ.title : "Introduction"}
+            
+            Task: Welcome the candidate warmly and introduce the first problem briefly.
+            Do not solve the problem, just introduce it.
+            Keep it under 3 sentences.
+            Be professional but encouraging.
+        `;
+    } else if (this.session.status === InterviewStatus.IN_PROGRESS || this.session.status === InterviewStatus.PENDING) {
+      context = `
+            You are an AI interviewer named Alex conducting a technical interview.
+            
+            Job Role: ${this.session.jobType}
+            Current Question: ${currentQ ? JSON.stringify(currentQ) : "General Discussion"}
+            
+            Candidate says: "${message}"
+            
+            Task: Respond to the candidate. 
+            - If they are asking for clarification, provide it without giving away the solution.
+            - If they are stuck, provide a subtle hint.
+            - If they are just thinking aloud, encourage them.
+            - Keep responses concise and helpful.
+        `;
+    } else {
+      // Post-interview context
+      context = `
+          You are a helpful AI assistant discussing the results of a technical interview with the candidate.
+          
+          Interview Context:
+          Job: ${this.session.jobType}
+          Difficulty: ${this.session.difficulty}
+          Feedback: ${JSON.stringify(this.session.feedback)}
+          
+          Candidate's Question: "${message}"
+          
+          Answer the candidate's question helpfully and encouragingly. refer to specific parts of their performance if possible.
+        `;
+    }
 
     let aiResponseText = "";
     try {
@@ -528,7 +564,7 @@ Return ONLY the JSON object with this structure:
       responseId: `chat_${Date.now()}`,
       sessionId: this.session.sessionId,
       questionId: "chat",
-      type: AIResponseType.ENCOURAGEMENT, // Reusing this type for chat
+      type: AIResponseType.ENCOURAGEMENT,
       content: aiResponseText,
       generatedAt: new Date().toISOString(),
       sentiment: Sentiment.NEUTRAL,
@@ -792,8 +828,8 @@ Return ONLY the JSON object with this structure:
           if (request.method !== "POST") {
             return new Response("Method Not Allowed", { status: 405 });
           }
-          const { message } = await request.json() as any;
-          const chatResult = await this.chat(message);
+          const chatBody = await request.json() as any;
+          const chatResult = await this.chat(chatBody.message, chatBody.action);
           return new Response(JSON.stringify({ success: true, ...chatResult }), {
             headers: { "Content-Type": "application/json" }
           });

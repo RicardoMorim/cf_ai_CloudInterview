@@ -43,6 +43,63 @@ export const InterviewProvider: React.FC<InterviewProviderProps> = ({ children }
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+    // Restore state from session on mount/update
+    React.useEffect(() => {
+        if (currentSession) {
+            setIsInterviewActive(true);
+
+            // Restore current question
+            if (!currentQuestion && currentSession.questions && currentSession.questions.length > 0) {
+                const index = currentSession.currentQuestionIndex || 0;
+                if (index < currentSession.questions.length) {
+                    setCurrentQuestion(currentSession.questions[index]);
+                }
+            }
+
+            // Restore history if empty
+            if (sessionHistory.length === 0) {
+                const history: any[] = [];
+
+                // Add questions
+                currentSession.questions?.forEach((q, idx) => {
+                    // Only add questions that have been reached
+                    if (idx <= (currentSession.currentQuestionIndex || 0)) {
+                        history.push({
+                            type: 'question',
+                            content: q,
+                            timestamp: new Date().toISOString() // Approximate if not stored
+                        });
+                    }
+                });
+
+                // Add answers
+                currentSession.answers?.forEach(a => {
+                    history.push({
+                        type: 'answer',
+                        content: a,
+                        timestamp: a.submittedAt
+                    });
+                });
+
+                // Add AI responses
+                currentSession.aiResponses?.forEach(r => {
+                    history.push({
+                        type: 'ai_response',
+                        content: r,
+                        timestamp: r.generatedAt
+                    });
+                });
+
+                // Sort by timestamp
+                history.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
+                if (history.length > 0) {
+                    setSessionHistory(history);
+                }
+            }
+        }
+    }, [currentSession, currentQuestion, sessionHistory.length]);
+
     const startInterview = useCallback(async (interviewData: CreateSessionRequest) => {
         setLoading(true);
         setError(null);
@@ -57,7 +114,16 @@ export const InterviewProvider: React.FC<InterviewProviderProps> = ({ children }
                 localStorage.setItem('cloudinterview-current-session', JSON.stringify(session));
 
                 // Get first question
-                const questionResponse = await sessionApi.getNextQuestion(session.sessionId);
+                // If the session already has questions (e.g. created with initial questions), use the current one
+                let questionResponse: InterviewQuestion | null = null;
+
+                if (session.questions && session.questions.length > 0 && session.currentQuestionIndex < session.questions.length) {
+                    questionResponse = session.questions[session.currentQuestionIndex];
+                } else {
+                    // Otherwise fetch next (this might increment index on backend, so be careful)
+                    questionResponse = await sessionApi.getNextQuestion(session.sessionId);
+                }
+
                 if (questionResponse) {
                     setCurrentQuestion(questionResponse);
                     setSessionHistory(prev => [...prev, {
