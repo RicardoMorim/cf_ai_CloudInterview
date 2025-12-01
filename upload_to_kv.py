@@ -2,7 +2,7 @@
 """
 Cloudflare KV Upload Script for LeetCode Problems
 
-This script parses a CSV file containing coding question data and uploads
+This script parses a CSV or JSON file containing coding question data and uploads
 the resulting data into a Cloudflare KV database for fast access by Workers.
 
 Usage:
@@ -20,14 +20,13 @@ import json
 import logging
 import os
 import sys
+import time
 from typing import Any, Dict, List, Optional
 from urllib.parse import quote_plus
 
 import requests
 from tqdm import tqdm
 
-LAST_PROBLEM_ID = 1930
-ERROR_PROBLEM_ID = 1262
 class CloudflareKVUploader:
     """Handles uploading data to Cloudflare KV using the REST API."""
     
@@ -113,6 +112,21 @@ class CloudflareKVUploader:
             return results
 
 
+def should_process_problem(problem_id: int) -> bool:
+    """
+    Determine if a problem should be processed based on filtering rules.
+    
+    Rules:
+    - Process ID 1262
+    - Process IDs >= 1931
+    """
+    if problem_id == 1262:
+        return True
+    if problem_id >= 1931:
+        return True
+    return False
+
+
 def parse_csv_row(row: Dict[str, str]) -> Optional[Dict[str, Any]]:
     """
     Parse a single CSV row into a structured problem dictionary.
@@ -129,9 +143,8 @@ def parse_csv_row(row: Dict[str, str]) -> Optional[Dict[str, Any]]:
         if not frontend_question_id:
             return None
         
-        if int(frontend_question_id) <= LAST_PROBLEM_ID:
-            return None
-        if int(frontend_question_id) == ERROR_PROBLEM_ID:
+        problem_id = int(frontend_question_id)
+        if not should_process_problem(problem_id):
             return None
         
         # Parse topics from string to list
@@ -179,7 +192,7 @@ def parse_csv_row(row: Dict[str, str]) -> Optional[Dict[str, Any]]:
         
         # Create the problem dictionary
         problem = {
-            "id": int(frontend_question_id),
+            "id": problem_id,
             "difficulty": row.get('difficulty', '').strip(),
             "title": row.get('title', '').strip(),
             "titleSlug": row.get('titleSlug', '').strip(),
@@ -231,6 +244,37 @@ def parse_csv_row(row: Dict[str, str]) -> Optional[Dict[str, Any]]:
         return None
 
 
+def parse_json_problem(json_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """
+    Parse a JSON problem entry into a structured problem dictionary.
+    """
+    try:
+        question_id = json_data.get('questionId')
+        if not question_id:
+            return None
+            
+        problem_id = int(question_id)
+        if not should_process_problem(problem_id):
+            return None
+            
+        problem = {
+            "id": problem_id,
+            "difficulty": json_data.get('difficulty', ''),
+            "title": json_data.get('title', ''),
+            "titleSlug": json_data.get('titleSlug', ''),
+            "url": json_data.get('url', ''),
+            "description": json_data.get('description', ''),
+            "metadata": {
+                "topics": json_data.get('topics', []),
+                "category": json_data.get('category', 'General')
+            }
+        }
+        return problem
+    except Exception as e:
+        logging.error(f"Error parsing JSON problem: {str(e)}")
+        return None
+
+
 def create_essentials_entry(problems: List[Dict[str, Any]]) -> Dict[str, Any]:
     """
     Create the essentials entry containing basic info for all problems.
@@ -263,38 +307,60 @@ def create_essentials_entry(problems: List[Dict[str, Any]]) -> Dict[str, Any]:
     }
 
 
-def upload_csv_to_kv(csv_file: str, kv_uploader: CloudflareKVUploader, batch_size: int = 50):
+def upload_file_to_kv(file_path: str, kv_uploader: CloudflareKVUploader, batch_size: int = 50, skip_essentials: bool = False):
     """
-    Main function to upload CSV data to Cloudflare KV.
+    Main function to upload data to Cloudflare KV.
     
     Args:
-        csv_file: Path to the CSV file
+        file_path: Path to the CSV or JSON file
         kv_uploader: CloudflareKVUploader instance
         batch_size: Number of entries to upload in each batch
+        skip_essentials: Whether to skip uploading the essentials entry
     """
-    logging.info(f"Starting upload from {csv_file}")
+    logging.info(f"Starting upload from {file_path}")
     
     problems = []
     processed_count = 0
     success_count = 0
     failed_count = 0
     
-    # First pass: read and parse all data
-    logging.info("Reading and parsing CSV data...")
-    with open(csv_file, 'r', encoding='utf-8', newline='') as file:
-        reader = csv.DictReader(file)
-        
-        for row in reader:
-            problem = parse_csv_row(row)
-            if problem:
-                problems.append(problem)
-                processed_count += 1
+    # Read and parse data
+    logging.info("Reading and parsing data...")
+    
+    if file_path.endswith('.json'):
+        with open(file_path, 'r', encoding='utf-8') as file:
+            data = json.load(file)
+            # Handle both list of problems or object with "problems" key
+            if isinstance(data, dict) and "problems" in data:
+                raw_problems = data["problems"]
+            elif isinstance(data, list):
+                raw_problems = data
+            else:
+                logging.error("Invalid JSON format. Expected list or object with 'problems' key.")
+                return 0, 0
                 
+            for p in raw_problems:
+                problem = parse_json_problem(p)
+                if problem:
+                    problems.append(problem)
+                processed_count += 1
+    else:
+        with open(file_path, 'r', encoding='utf-8', newline='') as file:
+            reader = csv.DictReader(file)
+            for row in reader:
+                problem = parse_csv_row(row)
+                if problem:
+                    problems.append(problem)
+                processed_count += 1
                 if processed_count % 1000 == 0:
                     logging.info(f"Processed {processed_count} rows...")
     
     logging.info(f"Successfully parsed {len(problems)} problems from {processed_count} rows")
     
+    if not problems:
+        logging.warning("No problems found matching criteria.")
+        return 0, 0
+
     # Upload individual problem entries
     logging.info("Uploading individual problem entries...")
     with tqdm(total=len(problems), desc="Uploading problems") as pbar:
@@ -314,19 +380,22 @@ def upload_csv_to_kv(csv_file: str, kv_uploader: CloudflareKVUploader, batch_siz
             pbar.update(len(batch))
     
     # Upload essentials entry
-    logging.info("Uploading essentials entry...")
-    essentials = create_essentials_entry(problems)
-    essentials["last_updated"] = str(int(asyncio.get_event_loop().time()))  # Simple timestamp
-    
-    essentials_key = "essentials"
-    essentials_value = json.dumps(essentials, ensure_ascii=False, separators=(',', ':'))
-    
-    if kv_uploader.put(essentials_key, essentials_value):
-        logging.info("Successfully uploaded essentials entry")
-        success_count += 1
+    if not skip_essentials:
+        logging.info("Uploading essentials entry...")
+        essentials = create_essentials_entry(problems)
+        essentials["last_updated"] = str(int(time.time()))
+        
+        essentials_key = "essentials"
+        essentials_value = json.dumps(essentials, ensure_ascii=False, separators=(',', ':'))
+        
+        if kv_uploader.put(essentials_key, essentials_value):
+            logging.info("Successfully uploaded essentials entry")
+            success_count += 1
+        else:
+            logging.error("Failed to upload essentials entry")
+            failed_count += 1
     else:
-        logging.error("Failed to upload essentials entry")
-        failed_count += 1
+        logging.info("Skipping essentials entry upload as requested.")
     
     return success_count, failed_count
 
@@ -334,11 +403,12 @@ def upload_csv_to_kv(csv_file: str, kv_uploader: CloudflareKVUploader, batch_siz
 def main():
     """Main entry point."""
     parser = argparse.ArgumentParser(description='Upload LeetCode problems to Cloudflare KV')
-    parser.add_argument('--csv', required=True, help='Path to the CSV file')
+    parser.add_argument('--csv', required=True, help='Path to the CSV or JSON file')
     parser.add_argument('--account-id', required=True, help='Cloudflare account ID')
     parser.add_argument('--api-token', required=True, help='Cloudflare API token')
     parser.add_argument('--namespace-id', required=True, help='KV namespace ID')
     parser.add_argument('--batch-size', type=int, default=50, help='Batch size for uploads (default: 50)')
+    parser.add_argument('--skip-essentials', action='store_true', help='Skip uploading the essentials index')
     parser.add_argument('--log-level', default='INFO', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'],
                        help='Logging level (default: INFO)')
     
@@ -356,7 +426,7 @@ def main():
     
     # Validate inputs
     if not os.path.exists(args.csv):
-        logging.error(f"CSV file not found: {args.csv}")
+        logging.error(f"File not found: {args.csv}")
         sys.exit(1)
     
     # Initialize KV uploader
@@ -364,17 +434,17 @@ def main():
     
     try:
         # Upload data
-        success_count, failed_count = upload_csv_to_kv(args.csv, kv_uploader, args.batch_size)
+        success_count, failed_count = upload_file_to_kv(args.csv, kv_uploader, args.batch_size, args.skip_essentials)
         
         # Print summary
         logging.info("=" * 50)
         logging.info("UPLOAD SUMMARY")
         logging.info("=" * 50)
-        logging.info(f"Total problems processed: {success_count + failed_count - 1}")  # -1 for essentials
+        logging.info(f"Total problems processed: {success_count + failed_count}")
         logging.info(f"Successful uploads: {success_count}")
         logging.info(f"Failed uploads: {failed_count}")
-        logging.info(f"Success rate: {(success_count / (success_count + failed_count) * 100):.1f}%")
-        logging.info("Essentials entry: Uploaded" if success_count > failed_count else "Essentials entry: Failed")
+        if success_count + failed_count > 0:
+            logging.info(f"Success rate: {(success_count / (success_count + failed_count) * 100):.1f}%")
         logging.info("=" * 50)
         
         if failed_count == 0:

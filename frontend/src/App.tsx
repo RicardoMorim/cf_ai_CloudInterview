@@ -4,6 +4,7 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import { InterviewProvider } from './contexts/InterviewContext';
 import HomePage from './pages/HomePage';
 import InterviewPage from './pages/InterviewPage';
+import InterviewResultsPage from './pages/InterviewResultsPage';
 import BehavioralInterviewPage from './pages/BehavioralInterviewPage';
 import DashboardPage from './pages/DashboardPage';
 import ProfilePage from './pages/ProfilePage';
@@ -22,6 +23,7 @@ function App() {
                         <Route path="/" element={<Layout />}>
                             <Route index element={<HomePage />} />
                             <Route path="interview" element={<InterviewPage />} />
+                            <Route path="interview/:sessionId/results" element={<InterviewResultsPage />} />
                             <Route path="interview/behavioral" element={<BehavioralInterviewPage />} />
                             <Route path="dashboard" element={<DashboardPage />} />
                             <Route path="profile" element={<ProfilePage />} />

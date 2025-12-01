@@ -1,6 +1,6 @@
 // Interview Session Management Service using Durable Objects
 
-import { InterviewSession, InterviewQuestion, InterviewAnswer, AIResponse, InterviewMode, InterviewStatus, Difficulty, QuestionType, Sentiment, AIResponseType, ExperienceLevel } from "../types";
+import { InterviewSession, InterviewQuestion, InterviewAnswer, AIResponse, InterviewMode, InterviewStatus, Difficulty, QuestionType, Sentiment, AIResponseType, ExperienceLevel, Essentials } from "../types";
 import { InterviewSessionRepository } from "./interfaces";
 
 interface Env {
@@ -80,8 +80,13 @@ export class InterviewSessionDO {
     if (mode === InterviewMode.TECHNICAL) {
       try {
         // 1. Fetch essentials list from KV
-        let essentialsData = await this.state.storage.get<any>("essentials") ||
-          await this.env.KV.get("essentials", { type: "json" });
+        const keys = await this.env.KV.list();
+        console.log('Available keys:', keys);
+
+        console.log('Data:', await this.env.KV.get("essentials", { type: "json" }));
+        var essentialsData: Essentials = await this.env.KV.get("essentials", { type: "json" });
+
+        console.log("DO: KV essentials:", essentialsData);
 
         // Fallback to local data if KV is empty
         if (!essentialsData || !essentialsData.problems) {
@@ -89,7 +94,7 @@ export class InterviewSessionDO {
           const { TECHNICAL_QUESTIONS } = await import("../data/questions");
           essentialsData = {
             problems: TECHNICAL_QUESTIONS.map(q => ({
-              id: q.questionId,
+              questionId: q.questionId,
               title: q.title,
               difficulty: q.difficulty,
               topics: q.tags
@@ -156,7 +161,7 @@ ${limitedPool.map((p: any) => `${p.id}: ${p.title} (${p.topics.join(', ')})`).jo
           } catch (aiError) {
             console.error("DO: AI selection failed, falling back to random:", aiError);
             if (pool.length > 0) {
-              selectedId = pool[Math.floor(Math.random() * pool.length)].id;
+              selectedId = pool[Math.floor(Math.random() * pool.length)].questionId;
             }
           }
 
@@ -180,7 +185,7 @@ ${limitedPool.map((p: any) => `${p.id}: ${p.title} (${p.topics.join(', ')})`).jo
                 selectedQuestions.push(fullProblem);
               } else {
                 selectedQuestions.push({
-                  questionId: fullProblem.id.toString(),
+                  questionId: fullProblem.questionId.toString(),
                   type: QuestionType.CODING,
                   category: fullProblem.metadata?.category || "General",
                   difficulty: fullProblem.difficulty as Difficulty,
@@ -403,7 +408,7 @@ Return ONLY the JSON object with this structure:
     };
   }
 
-  // Complete the session
+  // Complete the session and generate feedback
   async completeSession(): Promise<InterviewSession> {
     if (!this.session) {
       throw new Error("No session found");
@@ -419,6 +424,67 @@ Return ONLY the JSON object with this structure:
       this.session.duration = Math.floor((now.getTime() - start.getTime()) / 1000);
     }
 
+    // Generate Final Feedback if not already present
+    if (!this.session.feedback) {
+      try {
+        const summaryPrompt = `
+          Generate a final interview summary for the candidate based on these answers:
+          ${JSON.stringify(this.session.answers.map((a: any) => ({ q: a.questionId, a: a.answerText, score: a.evaluation?.score })))}
+          
+          Return JSON:
+          - overallScore: 0-100
+          - summary: Executive summary of performance.
+          - strengths: List of strings.
+          - improvementAreas: List of strings.
+          - specificRecommendations: List of strings (actionable advice).
+          - recommendation: "Hire", "No Hire", "Strong Hire", "Leaning No Hire".
+        `;
+
+        const aiResponse = await this.env.AI.run("@cf/meta/llama-3.3-70b-instruct-fp8-fast", {
+          messages: [{ role: "user", content: summaryPrompt }],
+          temperature: 0.4,
+          max_tokens: 1500
+        });
+
+        let responseText = "";
+        if (aiResponse) {
+          if (typeof aiResponse.response === 'string') {
+            responseText = aiResponse.response;
+          } else if (typeof aiResponse === 'string') {
+            responseText = aiResponse;
+          } else if (aiResponse.result && typeof aiResponse.result.response === 'string') {
+            responseText = aiResponse.result.response;
+          }
+        }
+
+        const cleanResponse = responseText.replace(/```json|```/g, '').trim();
+        const feedbackData = JSON.parse(cleanResponse);
+
+        this.session.feedback = {
+          feedbackId: `fb_${Date.now()}`,
+          sessionId: this.session.sessionId,
+          overallScore: feedbackData.overallScore || 0,
+          summary: feedbackData.summary || "No summary generated.",
+          strengths: feedbackData.strengths || [],
+          improvementAreas: feedbackData.improvementAreas || [],
+          specificRecommendations: feedbackData.specificRecommendations || [],
+          generatedAt: new Date().toISOString()
+        };
+      } catch (e) {
+        console.error("DO: Failed to generate final feedback:", e);
+        this.session.feedback = {
+          feedbackId: `fb_err_${Date.now()}`,
+          sessionId: this.session.sessionId,
+          overallScore: 70,
+          summary: "Interview completed. Feedback generation failed.",
+          strengths: [],
+          improvementAreas: [],
+          specificRecommendations: [],
+          generatedAt: new Date().toISOString()
+        };
+      }
+    }
+
     await this.saveSession();
 
     // Clean up timer
@@ -430,24 +496,67 @@ Return ONLY the JSON object with this structure:
     return this.session;
   }
 
-  // Cancel the session
-  async cancelSession(): Promise<InterviewSession> {
+  // Handle post-interview chat
+  async chat(message: string): Promise<{ response: string; session: InterviewSession }> {
     if (!this.session) {
       throw new Error("No session found");
     }
 
-    this.session.status = InterviewStatus.CANCELLED;
-    this.session.completedAt = new Date().toISOString();
+    const context = `
+      You are a helpful AI assistant discussing the results of a technical interview with the candidate.
+      
+      Interview Context:
+      Job: ${this.session.jobType}
+      Difficulty: ${this.session.difficulty}
+      Feedback: ${JSON.stringify(this.session.feedback)}
+      
+      Candidate's Question: ${message}
+      
+      Answer the candidate's question helpfully and encouragingly. refer to specific parts of their performance if possible.
+    `;
+
+    let aiResponseText = "";
+    try {
+      const aiResponse = await this.env.AI.run("@cf/meta/llama-3.3-70b-instruct-fp8-fast", {
+        messages: [{ role: "user", content: context }],
+        temperature: 0.7,
+        max_tokens: 800
+      });
+
+      if (aiResponse) {
+        if (typeof aiResponse.response === 'string') {
+          aiResponseText = aiResponse.response;
+        } else if (typeof aiResponse === 'string') {
+          aiResponseText = aiResponse;
+        } else if (aiResponse.result && typeof aiResponse.result.response === 'string') {
+          aiResponseText = aiResponse.result.response;
+        }
+      }
+    } catch (e) {
+      console.error("DO: Chat generation failed:", e);
+      aiResponseText = "I'm sorry, I'm having trouble processing your request right now.";
+    }
+
+    // Store the interaction
+    this.session.aiResponses.push({
+      responseId: `chat_${Date.now()}`,
+      sessionId: this.session.sessionId,
+      questionId: "chat",
+      type: AIResponseType.ENCOURAGEMENT, // Reusing this type for chat
+      content: aiResponseText,
+      generatedAt: new Date().toISOString(),
+      sentiment: Sentiment.NEUTRAL,
+      followUp: false,
+      responseTime: 0,
+      confidence: 1
+    });
 
     await this.saveSession();
 
-    // Clean up timer
-    if (this.timerId) {
-      clearInterval(this.timerId);
-      this.timerId = null;
-    }
-
-    return this.session;
+    return {
+      response: aiResponseText,
+      session: this.session
+    };
   }
 
   // Add feedback to the session
@@ -562,15 +671,121 @@ Return ONLY the JSON object with this structure:
             headers: { "Content-Type": "application/json" }
           });
 
-        case "/answer":
+        case "/answer": {
           if (request.method !== "POST") {
             return new Response("Method Not Allowed", { status: 405 });
           }
-          const answer = await request.json() as InterviewAnswer;
-          const result = await this.submitAnswer(answer);
-          return new Response(JSON.stringify({ success: true, ...result }), {
+          const answerData = await request.json() as any;
+
+          if (!this.session) {
+            return new Response(JSON.stringify({ success: false, error: "Session not found" }), { status: 404 });
+          }
+
+          const currentQ = this.session.questions[this.session.currentQuestionIndex];
+          const answerId = `ans_${Date.now()}`;
+
+          // Construct full answer object
+          const fullAnswer: InterviewAnswer = {
+            answerId,
+            sessionId: this.session.sessionId,
+            questionId: currentQ.questionId,
+            answerText: answerData.answerText || "",
+            submittedAt: new Date().toISOString(),
+            responseTime: answerData.responseTime || 0,
+            codeSubmission: answerData.codeSubmission,
+            approachExplanation: answerData.codeSubmission?.approachExplanation,
+            completenessScore: 0,
+            relevanceScore: 0,
+            communicationScore: 0
+          };
+
+          // 1. Submit the answer (save to state)
+          await this.submitAnswer(fullAnswer);
+
+          // 2. Evaluate with AI
+          let aiResponseData: AIResponse | null = null;
+          try {
+            const evaluationPrompt = `
+              You are an expert technical interviewer. Evaluate the candidate's answer to the following question.
+              
+              Question: ${currentQ.text}
+              Type: ${currentQ.type}
+              Difficulty: ${currentQ.difficulty}
+              
+              Candidate Answer: ${fullAnswer.answerText}
+              ${fullAnswer.codeSubmission ? `Candidate Code (${fullAnswer.codeSubmission.language}):\n${fullAnswer.codeSubmission.code}` : ''}
+              
+              Provide a JSON response with:
+              - feedback: Constructive feedback to the candidate (speak directly to them).
+              - score: 0-100 score.
+              - sentiment: "positive", "neutral", or "negative".
+              - followUp: true/false if a follow-up is needed.
+            `;
+
+            const aiGenResponse = await this.env.AI.run("@cf/meta/llama-3.3-70b-instruct-fp8-fast", {
+              messages: [{ role: "user", content: evaluationPrompt }]
+            });
+
+            let responseText = "";
+            if (aiGenResponse) {
+              if (typeof aiGenResponse.response === 'string') {
+                responseText = aiGenResponse.response;
+              } else if (typeof aiGenResponse === 'string') {
+                responseText = aiGenResponse;
+              } else if (aiGenResponse.result && typeof aiGenResponse.result.response === 'string') {
+                responseText = aiGenResponse.result.response;
+              }
+            }
+
+            const cleanResponse = responseText.replace(/```json|```/g, '').trim();
+            const evaluation = JSON.parse(cleanResponse);
+
+            // Create AI Response object
+            aiResponseData = {
+              responseId: `resp_${Date.now()}`,
+              sessionId: this.session.sessionId,
+              questionId: currentQ.questionId,
+              type: AIResponseType.FEEDBACK,
+              content: evaluation.feedback,
+              generatedAt: new Date().toISOString(),
+              sentiment: evaluation.sentiment as Sentiment || Sentiment.NEUTRAL,
+              followUp: evaluation.followUp || false,
+              responseTime: 0,
+              confidence: 1
+            };
+
+            // Save AI response
+            await this.addAIResponse(aiResponseData);
+
+          } catch (aiError) {
+            console.error("DO: AI evaluation failed:", aiError);
+            // Fallback response
+            aiResponseData = {
+              responseId: `resp_${Date.now()}`,
+              sessionId: this.session.sessionId,
+              questionId: currentQ.questionId,
+              type: AIResponseType.FEEDBACK,
+              content: "Thank you for your answer. Let's proceed.",
+              generatedAt: new Date().toISOString(),
+              sentiment: Sentiment.NEUTRAL,
+              followUp: false,
+              responseTime: 0,
+              confidence: 1
+            };
+            await this.addAIResponse(aiResponseData);
+          }
+
+          // 3. Determine next question (if any)
+          // For now, we just return the current state, client calls /next
+
+          return new Response(JSON.stringify({
+            success: true,
+            session: this.session,
+            aiResponse: aiResponseData
+          }), {
             headers: { "Content-Type": "application/json" }
           });
+        }
 
         case "/next":
           const nextResult = await this.nextQuestion();
@@ -584,6 +799,16 @@ Return ONLY the JSON object with this structure:
           }
           const completedSession = await this.completeSession();
           return new Response(JSON.stringify({ success: true, session: completedSession }), {
+            headers: { "Content-Type": "application/json" }
+          });
+
+        case "/chat":
+          if (request.method !== "POST") {
+            return new Response("Method Not Allowed", { status: 405 });
+          }
+          const { message } = await request.json() as any;
+          const chatResult = await this.chat(message);
+          return new Response(JSON.stringify({ success: true, ...chatResult }), {
             headers: { "Content-Type": "application/json" }
           });
 

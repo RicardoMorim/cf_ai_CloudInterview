@@ -98,6 +98,17 @@ export enum Sentiment {
 }
 
 // Value Objects
+export interface Problem {
+  difficulty: Difficulty;
+  questionId: string;
+  title: string;
+  topics: string[];
+}
+
+export interface Essentials {
+  problems: Problem[];
+}
+
 export interface UserProfile {
   jobTitles: string[];
   experienceLevel: ExperienceLevel;
@@ -229,16 +240,16 @@ export interface InterviewFeedback {
   sessionId: string;
   overallScore: number;
   summary: string;
-  technicalSkills: SkillAssessment;
-  communication: SkillAssessment;
-  problemSolving: SkillAssessment;
-  domainKnowledge: SkillAssessment;
+  technicalSkills?: SkillAssessment;
+  communication?: SkillAssessment;
+  problemSolving?: SkillAssessment;
+  domainKnowledge?: SkillAssessment;
   behavioralCompetencies?: BehavioralAssessment;
   strengths: string[];
   improvementAreas: string[];
   specificRecommendations: string[];
-  percentileRank: number;
-  benchmarkComparison: BenchmarkComparison;
+  percentileRank?: number;
+  benchmarkComparison?: BenchmarkComparison;
   generatedAt: string;
 }
 

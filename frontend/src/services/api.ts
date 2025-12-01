@@ -1,7 +1,8 @@
 import axios from 'axios';
 import { CreateSessionRequest, InterviewSession, InterviewQuestion, InterviewAnswer, AIResponse, Difficulty, QuestionType } from '../types';
+import { env } from 'process';
 
-export const API_BASE_URL = 'http://localhost:8787';
+export const API_BASE_URL = env.REACT_APP_API_URL;
 
 const api = axios.create({
     baseURL: API_BASE_URL,
@@ -34,8 +35,13 @@ export const sessionApi = {
     },
 
     endSession: async (sessionId: string): Promise<any> => {
-        const response = await api.post(`/api/sessions/${sessionId}/complete`);
-        return response.data.session;
+        const response = await api.post(`/api/sessions/${sessionId}/end`);
+        return response.data;
+    },
+
+    sendChatMessage: async (sessionId: string, message: string): Promise<{ response: string; session: InterviewSession }> => {
+        const response = await api.post(`/api/sessions/${sessionId}/chat`, { message });
+        return response.data;
     },
 
     updateState: async (sessionId: string, state: any) => {

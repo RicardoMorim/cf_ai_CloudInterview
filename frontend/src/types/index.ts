@@ -78,15 +78,35 @@ export interface InterviewAnswer {
     };
 }
 
+export enum AIResponseType {
+    QUESTION = "question",
+    FEEDBACK = "feedback",
+    HINT = "hint",
+    EVALUATION = "evaluation",
+    ENCOURAGEMENT = "encouragement"
+}
+
 export interface AIResponse {
     responseId: string;
     sessionId: string;
     questionId?: string;
-    type: "question" | "feedback" | "hint" | "evaluation" | "encouragement";
+    type: AIResponseType;
     content: string;
     generatedAt: string;
     sentiment: "positive" | "neutral" | "negative";
     followUp: boolean;
+}
+
+export interface InterviewFeedback {
+    feedbackId: string;
+    sessionId: string;
+    overallScore: number;
+    summary: string;
+    strengths: string[];
+    improvementAreas: string[];
+    specificRecommendations: string[];
+    generatedAt: string;
+    recommendation?: string;
 }
 
 export interface InterviewSession {
@@ -107,6 +127,7 @@ export interface InterviewSession {
     jobTitle?: string;
     jobDescription?: string;
     seniority?: ExperienceLevel;
+    feedback?: InterviewFeedback;
 }
 
 export interface CreateSessionRequest {

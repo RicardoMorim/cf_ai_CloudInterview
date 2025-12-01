@@ -33,7 +33,7 @@
   "migrations": [
     {
       "tag": "v1",
-      "new_classes": ["Session"]
+      "new_sqlite_classes": ["Session"]
     }
   ],
 	/**

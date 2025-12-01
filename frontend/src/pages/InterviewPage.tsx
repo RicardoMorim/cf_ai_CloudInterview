@@ -6,11 +6,12 @@ import { aiApi } from '../services/api';
 import Editor from '@monaco-editor/react';
 import { FiSend, FiMic, FiMicOff, FiCode, FiCpu, FiClock, FiStopCircle } from 'react-icons/fi';
 import './InterviewPage.css';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import { ProgrammingLanguage } from '../types';
 
 const InterviewPage: React.FC = () => {
+    const navigate = useNavigate();
     const {
         currentSession,
         currentQuestion,
@@ -142,6 +143,16 @@ const InterviewPage: React.FC = () => {
         const mins = Math.floor(seconds / 60);
         const secs = seconds % 60;
         return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    };
+
+    const handleEndInterview = async () => {
+        if (!currentSession) return;
+        try {
+            await endInterview();
+            navigate(`/interview/${currentSession.sessionId}/results`);
+        } catch (error) {
+            console.error("Failed to end interview:", error);
+        }
     };
 
     if (!isInterviewActive) {
@@ -337,7 +348,7 @@ const InterviewPage: React.FC = () => {
                             <div className="submit-actions">
                                 <button
                                     className="button secondary"
-                                    onClick={endInterview}
+                                    onClick={handleEndInterview}
                                     disabled={loading}
                                     type="button"
                                 >

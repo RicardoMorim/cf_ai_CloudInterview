@@ -64,36 +64,33 @@ export class SessionNextQuestion extends OpenAPIRoute {
 		const { sessionId } = data.params;
 
 		try {
-			// TODO: Get session data from Durable Object
-			// For now, return a mock response
-			const mockQuestion = {
-				questionId: "q_123",
-				type: "coding",
-				category: "algorithms",
-				difficulty: "medium",
-				title: "Two Sum",
-				text: "Given an array of integers nums and an integer target, return indices of the two numbers such that they add up to target.",
-				estimatedTime: 15,
-				hints: ["Use hash map for O(1) lookup", "Consider complement values"],
-				followUpQuestions: ["What's the space complexity?", "How to handle duplicates?"]
-			};
+			const id = c.env.SESSION_NAMESPACE.idFromName(sessionId);
+			const stub = c.env.SESSION_NAMESPACE.get(id);
+
+			const response = await stub.fetch("http://internal/next");
+
+			if (!response.ok) {
+				throw new Error("Failed to fetch next question");
+			}
+
+			const result = await response.json() as any;
 
 			return {
 				success: true,
-				question: mockQuestion,
+				question: result.question,
 				session: {
-					currentQuestionIndex: 1,
-					remainingQuestions: 5,
-					estimatedTimeRemaining: 75
+					currentQuestionIndex: result.session.currentQuestionIndex,
+					remainingQuestions: result.session.questions.length - result.session.currentQuestionIndex,
+					estimatedTimeRemaining: 30 // Estimate
 				},
-				hasMore: true
+				hasMore: result.question !== null
 			};
 		} catch (error) {
 			return {
 				success: false,
 				error: {
-					code: "SESSION_NOT_FOUND",
-					message: `Session ${sessionId} not found`,
+					code: "SESSION_ERROR",
+					message: error instanceof Error ? error.message : "Failed to get next question",
 					timestamp: new Date().toISOString()
 				}
 			};
