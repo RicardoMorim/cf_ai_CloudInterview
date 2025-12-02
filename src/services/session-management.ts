@@ -724,6 +724,7 @@ Return ONLY the JSON object with this structure:
           if (request.method !== "POST") {
             return new Response("Method Not Allowed", { status: 405 });
           }
+          await this.beginSession(); // Actually begin the session!
           const firstQuestion = await this.getCurrentQuestion();
           return new Response(JSON.stringify({ success: true, question: firstQuestion, session: this.session }), {
             headers: { "Content-Type": "application/json" }
