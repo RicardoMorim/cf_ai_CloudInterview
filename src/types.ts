@@ -208,6 +208,7 @@ export interface QuestionMetadata {
   lastUpdated: string;
   source?: string;
   relatedQuestions: string[];
+  leetcodeSlug?: string;
 }
 
 export interface GrowthTrajectory {

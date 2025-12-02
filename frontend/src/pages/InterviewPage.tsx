@@ -8,7 +8,7 @@ import { FiSend, FiMic, FiMicOff, FiCode, FiCpu, FiClock, FiStopCircle } from 'r
 import './InterviewPage.css';
 import { Link, useNavigate } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
-import { ProgrammingLanguage } from '../types';
+import { InterviewQuestion, ProgrammingLanguage } from '../types';
 
 const InterviewPage: React.FC = () => {
     const navigate = useNavigate();
@@ -30,18 +30,40 @@ const InterviewPage: React.FC = () => {
     const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
     const [consoleOutput, setConsoleOutput] = useState<{ output: string; error?: string } | null>(null);
     const [isRunning, setIsRunning] = useState(false);
+    const getLeetCodeUrl = (question: InterviewQuestion | null): string | null => {
+        if (!question) return null;
 
-    const handleRunCode = async () => {
-        if (!codeContent.trim()) return;
-        setIsRunning(true);
-        setConsoleOutput(null);
-        try {
-            const result = await aiApi.runCode(codeContent, selectedLanguage);
-            setConsoleOutput(result);
-        } catch (err) {
-            setConsoleOutput({ output: "", error: "Execution failed" });
-        } finally {
-            setIsRunning(false);
+        // Try to get slug from metadata
+        if (question.metadata?.leetcodeSlug) {
+            return `https://leetcode.com/problems/${question.metadata.leetcodeSlug}/`;
+        }
+
+        // Generate slug from title as fallback
+        if (question.title) {
+            const slug = question.title
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, '-')
+                .replace(/^-|-$/g, '');
+            return `https://leetcode.com/problems/${slug}/`;
+        }
+
+        return null;
+    };
+
+    const handleRunCode = () => {
+        const leetcodeUrl = getLeetCodeUrl(currentQuestion);
+
+        if (leetcodeUrl) {
+            // Open LeetCode in new tab
+            window.open(leetcodeUrl, '_blank');
+            setConsoleOutput({
+                output: `✅ Opened LeetCode problem in new tab!\n\nYou can test your solution there and come back here to submit your answer.`
+            });
+        } else {
+            setConsoleOutput({
+                output: "",
+                error: "Could not determine LeetCode URL for this problem."
+            });
         }
     };
 
@@ -87,19 +109,29 @@ const InterviewPage: React.FC = () => {
     }, [sessionHistory, speak]);
 
     // Simulate timer for interview
+    // Timer effect - counts down from allocated time
     useEffect(() => {
-        if (currentSession && currentSession.duration) {
-            const endTime = new Date(currentSession.startedAt || new Date()).getTime() +
-                (currentSession.duration * 60 * 1000);
-            const timer = setInterval(() => {
-                const now = Date.now();
-                const remaining = Math.max(0, Math.floor((endTime - now) / 1000));
-                setTimeRemaining(remaining);
-            }, 1000);
+        // Use 45 minutes as total allocated time (not elapsed duration)
+        const totalDurationMs = 45 * 60 * 1000;
+        const startTime = new Date().getTime();
+        const endTime = startTime + totalDurationMs;
 
-            return () => clearInterval(timer);
+        const timer = setInterval(() => {
+            const now = Date.now();
+            const remaining = Math.max(0, Math.floor((endTime - now) / 1000));
+            setTimeRemaining(remaining);
+        }, 1000);
+
+        if (!isInterviewActive) {
+            clearInterval(timer);
+            setTimeRemaining(null)
         }
-    }, [currentSession]);
+
+        return () => {
+            clearInterval(timer);
+            setTimeRemaining(null)
+        };
+    }, [isInterviewActive]);
 
     const handleSubmit = async (e?: React.FormEvent) => {
         if (e) e.preventDefault();
@@ -208,10 +240,10 @@ const InterviewPage: React.FC = () => {
                         </div>
                         <div className="question-content">
                             <h4>{currentQuestion?.title || 'Interview Question'}</h4>
-                            <div className="markdown-content">
-                                <ReactMarkdown>{currentQuestion?.text || ''}</ReactMarkdown>
-                            </div>
-
+                            <div
+                                className="question-text"
+                                dangerouslySetInnerHTML={{ __html: currentQuestion?.text || '' }}
+                            />
                             {currentQuestion?.hints && currentQuestion.hints.length > 0 && (
                                 <div className="question-hints">
                                     <h5>Hints:</h5>

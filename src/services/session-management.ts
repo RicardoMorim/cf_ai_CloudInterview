@@ -112,8 +112,8 @@ export class InterviewSessionDO {
           const pool = candidates.length > 0 ? candidates : essentialsData.problems;
           const limitedPool = pool.slice(0, 50);
 
-          // 3. Ask AI to select a question
-          let selectedId = "0";
+          // 3. Ask AI to select 1-3 questions
+          let questionIds: string[] = [];
           try {
             const prompt = `
 You are an expert technical interviewer. 
@@ -123,14 +123,17 @@ ${seniority ? `Seniority Level: ${seniority}` : ''}
 Difficulty: ${difficulty}
 ${jobDescription ? `Job Description Context: ${jobDescription.substring(0, 300)}...` : ''}
 
-Task: Select the most suitable coding problem from the list below for this interview.
-Rules:
-- Return ONLY the ID of the selected problem.
-- If no problem is suitable or you prefer to ask theoretical questions generated on the fly, return 0.
-- Do not add any explanation or text, just the ID.
+Available LeetCode Problems (first 50):
+${limitedPool.map((p: any) => `${p.questionId}: ${p.title} (${p.topics ? p.topics.join(', ') : ''})`).join('\n')}
 
-Problems:
-${limitedPool.map((p: any) => `${p.questionId}: ${p.title} (${p.topics.join(', ')})`).join('\n')}
+Task: Select 1-3 appropriate coding problems for this interview.
+- Choose problems that test different aspects (e.g., arrays, strings, algorithms)
+- Variety is important - pick complementary problems
+- Return a JSON array of question IDs: ["1262", "1931", "2045"]
+- Return ONLY the JSON array, nothing else
+- RESPOND IN ENGLISH ONLY
+
+Return format example: ["1262", "1931"]
 `;
             const response = await this.env.AI.run("@cf/meta/llama-3.3-70b-instruct-fp8-fast", {
               messages: [{ role: "user", content: prompt }]
@@ -138,57 +141,88 @@ ${limitedPool.map((p: any) => `${p.questionId}: ${p.title} (${p.topics.join(', '
 
             console.log("DO: AI Response:", JSON.stringify(response));
 
-            let responseText = "0";
+            let responseText = "[]";
             if (response) {
-              if (typeof response.response === 'string') {
+              // Check if response.response is already an array
+              if (Array.isArray(response.response)) {
+                questionIds = response.response.slice(0, 3); // Limit to max 3
+              } else if (typeof response.response === 'string') {
                 responseText = response.response.trim();
-              } else if (typeof response.response === 'number') {
-                responseText = response.response.toString();
               } else if (typeof response === 'string') {
                 responseText = response.trim();
+              } else if (response.result && Array.isArray(response.result.response)) {
+                questionIds = response.result.response.slice(0, 3);
               } else if (response.result && typeof response.result.response === 'string') {
                 responseText = response.result.response.trim();
               }
             }
 
-            selectedId = responseText.replace(/['"]/g, '').trim();
-            console.log(`DO: AI selected question ID: ${selectedId}`);
+            // Only parse if we haven't already extracted an array
+            if (questionIds.length === 0) {
+              // Parse as array
+              const cleanResponse = responseText.replace(/```json|```/g, '').trim();
+              try {
+                questionIds = JSON.parse(cleanResponse);
+                if (!Array.isArray(questionIds)) {
+                  // Fallback: treat as single ID
+                  questionIds = [cleanResponse.replace(/['\"]/g, '')];
+                }
+                // Limit to max 3
+                questionIds = questionIds.slice(0, 3);
+              } catch (parseError) {
+                // Fallback: treat response as single ID
+                questionIds = [cleanResponse.replace(/['\"]/g, '').trim()];
+              }
+            }
+
+            console.log(`DO: AI selected question IDs:`, questionIds);
 
           } catch (aiError) {
             console.error("DO: AI selection failed, falling back to random:", aiError);
             if (pool.length > 0) {
-              selectedId = pool[Math.floor(Math.random() * pool.length)].questionId;
+              // Pick 1-2 random problems as fallback
+              const count = Math.min(2, pool.length);
+              for (let i = 0; i < count; i++) {
+                questionIds.push(pool[Math.floor(Math.random() * pool.length)].questionId);
+              }
             }
           }
 
-          if (selectedId !== "0") {
-            // 4. Fetch full details
-            var fullProblem = await this.env.KV.get(`problem:${selectedId}`, { type: "json" }) as LeetCodeProblem;
+          // 4. Fetch full details for all selected problems
+          for (const selectedId of questionIds) {
+            if (selectedId && selectedId !== "0") {
+              if (selectedId !== "0") {
+                // 4. Fetch full details
+                var fullProblem = await this.env.KV.get(`problem:${selectedId}`, { type: "json" }) as LeetCodeProblem;
 
-            if (fullProblem) {
-              console.log("DO: Full problem details:", fullProblem);
+                if (fullProblem) {
+                  console.log("DO: Full problem details:", fullProblem);
 
-              // Map LeetCodeProblem to InterviewQuestion
-              const interviewQuestion: InterviewQuestion = {
-                questionId: fullProblem.id ? fullProblem.id.toString() : selectedId,
-                type: QuestionType.CODING,
-                category: fullProblem.metadata?.category || "Algorithms",
-                difficulty: (fullProblem.difficulty as Difficulty) || difficulty,
-                title: fullProblem.title,
-                text: fullProblem.description || fullProblem.title,
-                tags: fullProblem.metadata?.topics || [],
-                estimatedTime: 30,
-                followUpQuestions: [],
-                hints: fullProblem.metadata?.hints || [],
-                metadata: {
-                  difficultyWeight: 1,
-                  popularity: fullProblem.metadata?.likes || 0,
-                  lastUpdated: new Date().toISOString(),
-                  relatedQuestions: []
+                  // Map LeetCodeProblem to InterviewQuestion
+                  const interviewQuestion: InterviewQuestion = {
+                    questionId: fullProblem.id ? fullProblem.id.toString() : selectedId,
+                    type: QuestionType.CODING,
+                    category: fullProblem.metadata?.category || "Algorithms",
+                    difficulty: (fullProblem.difficulty as Difficulty) || difficulty,
+                    title: fullProblem.title,
+                    text: fullProblem.description || fullProblem.title,
+                    tags: fullProblem.metadata?.topics || [],
+                    estimatedTime: 30,
+                    followUpQuestions: [],
+                    hints: fullProblem.metadata?.hints || [],
+                    metadata: {
+                      difficultyWeight: 1,
+                      popularity: fullProblem.metadata?.likes || 0,
+                      lastUpdated: new Date().toISOString(),
+                      relatedQuestions: [],
+                      leetcodeSlug: fullProblem.titleSlug  // Add this line
+                    }
+                  };
+
+
+                  selectedQuestions.push(interviewQuestion);
                 }
-              };
-
-              selectedQuestions.push(interviewQuestion);
+              }
             }
           }
         }

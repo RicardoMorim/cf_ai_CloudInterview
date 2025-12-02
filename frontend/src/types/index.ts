@@ -118,8 +118,8 @@ export interface QuestionMetadata {
     difficultyWeight: number;
     popularity: number;
     lastUpdated: string;
-    source?: string;
     relatedQuestions: string[];
+    leetcodeSlug?: string;  // Add this line
 }
 
 export interface GrowthTrajectory {
