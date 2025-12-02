@@ -37,8 +37,8 @@ export const sessionApi = {
         return response.data;
     },
 
-    sendChatMessage: async (sessionId: string, message: string): Promise<{ response: string; session: InterviewSession }> => {
-        const response = await api.post(`/api/sessions/${sessionId}/chat`, { message });
+    sendChatMessage: async (sessionId: string, message: string, code?: string): Promise<{ response: string; session: InterviewSession }> => {
+        const response = await api.post(`/api/sessions/${sessionId}/chat`, { message, code });
         return response.data;
     },
 

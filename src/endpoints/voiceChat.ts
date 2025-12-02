@@ -68,7 +68,7 @@ export class VoiceChat extends OpenAPIRoute {
                 if (body.action === "greeting") {
                     // Generate Greeting
                     let context = "You are Alex, a senior technical recruiter at a top tech company. This is the start of the interview.";
-                    
+
                     if (currentQuestion) {
                         context += `\nThe first question will be: ${currentQuestion.title}.`;
                         context += "\nGoal: Introduce yourself briefly, welcome the candidate, and transition smoothly into the first question. Simulate a real interview.";
@@ -121,10 +121,12 @@ export class VoiceChat extends OpenAPIRoute {
 
                 // Add Interview Mode Context
                 const sessionState = await sessionStub.fetch("http://internal/state").then(r => r.json() as any);
-                const currentCode = sessionState.currentCode || "";
-                const interviewMode = sessionState.mode || "technical";
-                const jobDescription = sessionState.jobDescription || "";
-                const seniority = sessionState.seniority || "";
+                const currentCode = sessionState.session?.currentCode || sessionState.currentCode || "";
+                console.log("VoiceChat: Current code length:", currentCode.length);
+                console.log("VoiceChat: Current code preview:", currentCode.substring(0, 200));
+                const interviewMode = sessionState.session?.mode || sessionState.mode || "technical";
+                const jobDescription = sessionState.session?.jobDescription || sessionState.jobDescription || "";
+                const seniority = sessionState.session?.seniority || sessionState.seniority || "";
 
                 context += `\nInterview Mode: ${interviewMode.toUpperCase()}`;
                 if (seniority) context += `\nTarget Seniority: ${seniority}`;
@@ -134,8 +136,13 @@ export class VoiceChat extends OpenAPIRoute {
                     context += `\nCurrent Question: ${currentQuestion.title}\n${currentQuestion.text}`;
 
                     if (interviewMode === 'technical') {
-                        context += `\n\nCandidate's Current Code:\n\`\`\`${currentQuestion.language || 'javascript'}\n${currentCode}\n\`\`\``;
-                        context += "\nGoal: Guide the candidate through this technical problem. You can also ask theoretical questions related to the concepts used, or behavioral questions about their past experience with these technologies. Don't give the code answer directly, but provide hints only when needed. This is a technical interview.";
+                        if (currentCode && currentCode.length > 0) {
+                            context += `\n\nCandidate's Current Code:\n\`\`\`${currentQuestion.language || 'javascript'}\n${currentCode}\n\`\`\``;
+                            context += "\nGoal: Guide the candidate through this technical problem. You can also ask theoretical questions related to the concepts used, or behavioral questions about their past experience with these technologies. Don't give the code answer directly, but provide hints only when needed. This is a technical interview.";
+                        } else {
+                            context += "\n\nThe candidate hasn't written any code yet.";
+                            context += "\nGoal: Guide the candidate through this technical problem. You can also ask theoretical questions related to the concepts used, or behavioral questions about their past experience with these technologies. Don't give the code answer directly, but provide hints only when needed. This is a technical interview.";
+                        }
                     } else {
                         context += "\nGoal: This is a behavioral interview based on a specific scenario. Ask questions that will help you understand the candidate's past experience. Simulate a real interview.";
                     }

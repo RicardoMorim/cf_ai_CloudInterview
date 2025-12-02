@@ -30,6 +30,8 @@ const InterviewPage: React.FC = () => {
     const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
     const [consoleOutput, setConsoleOutput] = useState<{ output: string; error?: string } | null>(null);
     const [isRunning, setIsRunning] = useState(false);
+    const debounceTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+    const [hintsRevealed, setHintsRevealed] = useState(0);
     const getLeetCodeUrl = (question: InterviewQuestion | null): string | null => {
         if (!question) return null;
 
@@ -82,7 +84,8 @@ const InterviewPage: React.FC = () => {
         playGreeting
     } = useVoiceInterface({
         sessionId: currentSession?.sessionId,
-        onTranscript: handleVoiceTranscript
+        onTranscript: handleVoiceTranscript,
+        code: codeContent // Pass current code to voice interface
     });
 
     // Trigger initial greeting
@@ -132,6 +135,20 @@ const InterviewPage: React.FC = () => {
             setTimeRemaining(null)
         };
     }, [isInterviewActive]);
+
+    // Cleanup debounce timeout on unmount
+    useEffect(() => {
+        return () => {
+            if (debounceTimeoutRef.current) {
+                clearTimeout(debounceTimeoutRef.current);
+            }
+        };
+    }, []);
+
+    // Reset hints when question changes
+    useEffect(() => {
+        setHintsRevealed(0);
+    }, [currentQuestion?.questionId]);
 
     const handleSubmit = async (e?: React.FormEvent) => {
         if (e) e.preventDefault();
@@ -246,12 +263,25 @@ const InterviewPage: React.FC = () => {
                             />
                             {currentQuestion?.hints && currentQuestion.hints.length > 0 && (
                                 <div className="question-hints">
-                                    <h5>Hints:</h5>
-                                    <ul>
-                                        {currentQuestion.hints.map((hint, index) => (
-                                            <li key={index}>{hint}</li>
-                                        ))}
-                                    </ul>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                                        <h5>Hints ({hintsRevealed}/{currentQuestion.hints.length})</h5>
+                                        {hintsRevealed < currentQuestion.hints.length && (
+                                            <button
+                                                className="button secondary"
+                                                onClick={() => setHintsRevealed(prev => prev + 1)}
+                                                style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}
+                                            >
+                                                Show Next Hint
+                                            </button>
+                                        )}
+                                    </div>
+                                    {hintsRevealed > 0 && (
+                                        <ul>
+                                            {currentQuestion.hints.slice(0, hintsRevealed).map((hint, index) => (
+                                                <li key={index}>{hint}</li>
+                                            ))}
+                                        </ul>
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -327,14 +357,18 @@ const InterviewPage: React.FC = () => {
                                             const newCode = value || "";
                                             setCodeContent(newCode);
 
-                                            // Debounce update to backend
-                                            const timeoutId = setTimeout(() => {
+                                            // Clear previous timeout
+                                            if (debounceTimeoutRef.current) {
+                                                clearTimeout(debounceTimeoutRef.current);
+                                            }
+
+                                            // Set new timeout to update backend
+                                            debounceTimeoutRef.current = setTimeout(() => {
                                                 if (currentSession?.sessionId) {
+                                                    console.log("Saving code to session state:", newCode.substring(0, 100));
                                                     updateState({ currentCode: newCode });
                                                 }
                                             }, 1000); // 1 second debounce
-
-                                            return () => clearTimeout(timeoutId);
                                         }}
                                         options={{
                                             minimap: { enabled: false },

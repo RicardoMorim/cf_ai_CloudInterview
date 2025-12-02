@@ -517,7 +517,7 @@ Return ONLY the JSON object with this structure:
   }
 
   // Handle chat interactions (greeting, during interview, post-interview)
-  async chat(message: string, action?: string): Promise<{ response: string; session: InterviewSession }> {
+  async chat(message: string, action?: string, code?: string): Promise<{ response: string; session: InterviewSession }> {
     if (!this.session) {
       throw new Error("No session found");
     }
@@ -547,11 +547,13 @@ Return ONLY the JSON object with this structure:
             Job Role: ${this.session.jobType}
             Current Question: ${currentQ ? JSON.stringify(currentQ) : "General Discussion"}
             
+            ${code ? `Candidate's Current Code:\n\`\`\`\n${code}\n\`\`\`\n` : ''}
+            
             Candidate says: "${message}"
             
             Task: Respond to the candidate. 
             - If they are asking for clarification, provide it without giving away the solution.
-            - If they are stuck, provide a subtle hint.
+            - If they are stuck, provide a subtle hint${code ? ' based on their code' : ''}.
             - If they are just thinking aloud, encourage them.
             - Keep responses concise and helpful.
         `;
@@ -863,12 +865,13 @@ Return ONLY the JSON object with this structure:
             return new Response("Method Not Allowed", { status: 405 });
           }
           const chatBody = await request.json() as any;
-          const chatResult = await this.chat(chatBody.message, chatBody.action);
+          const chatResult = await this.chat(chatBody.message, chatBody.action, chatBody.code);
           return new Response(JSON.stringify({ success: true, ...chatResult }), {
             headers: { "Content-Type": "application/json" }
           });
 
         case "/state":
+          console.log("DO: Getting state, currentCode length:", (this.session as any)?.currentCode?.length || 0);
           return new Response(JSON.stringify({ success: true, session: this.session }), {
             headers: { "Content-Type": "application/json" }
           });
@@ -878,8 +881,10 @@ Return ONLY the JSON object with this structure:
             return new Response("Method Not Allowed", { status: 405 });
           }
           const updates = await request.json() as any;
+          console.log("DO: Updating state with:", updates);
           if (this.session) {
             this.session = { ...this.session, ...updates };
+            console.log("DO: Session after update, currentCode length:", (this.session as any).currentCode?.length || 0);
             await this.saveSession();
           }
           return new Response(JSON.stringify({ success: true, session: this.session }), {

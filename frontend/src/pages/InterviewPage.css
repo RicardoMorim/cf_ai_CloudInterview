@@ -1,5 +1,37 @@
 /* InterviewPage.css */
 
+.question-section {
+  max-width: 100% !important;
+  overflow: hidden !important;
+}
+
+.question-content,
+.question-text {
+  max-width: 100%;
+  overflow-x: auto;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.question-text pre,
+.question-text code {
+  max-width: 100%;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+/* Ensure Monaco editor doesn't overflow */
+.monaco-wrapper {
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.answer-section {
+  max-width: 100%;
+  overflow: hidden;
+}
+
 .interview-page {
   height: 100%;
   width: 100%;

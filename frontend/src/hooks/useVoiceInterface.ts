@@ -7,13 +7,15 @@ interface UseVoiceInterfaceProps {
     onTranscript?: (text: string) => void;
     onSpeakingStart?: () => void;
     onSpeakingEnd?: () => void;
+    code?: string; // Current code being worked on
 }
 
 export const useVoiceInterface = ({
     sessionId,
     onTranscript,
     onSpeakingStart,
-    onSpeakingEnd
+    onSpeakingEnd,
+    code
 }: UseVoiceInterfaceProps = {}) => {
     const [isListening, setIsListening] = useState(false);
     const [isSpeaking, setIsSpeaking] = useState(false);
@@ -190,7 +192,7 @@ export const useVoiceInterface = ({
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ action: 'greeting' })
+                body: JSON.stringify({ action: 'greeting', code })
             });
             console.log("Response status:", response.status);
 
