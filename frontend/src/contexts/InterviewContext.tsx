@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react';
 import { sessionApi, aiApi } from '../services/api';
 import { InterviewSession, InterviewQuestion, InterviewAnswer, AIResponse, CreateSessionRequest, InterviewMode, Difficulty, QuestionType } from '../types';
 
@@ -44,7 +44,7 @@ export const InterviewProvider: React.FC<InterviewProviderProps> = ({ children }
     const [error, setError] = useState<string | null>(null);
 
     // Restore state from session on mount/update
-    React.useEffect(() => {
+    useEffect(() => {
         if (currentSession) {
             setIsInterviewActive(true);
 
@@ -112,26 +112,6 @@ export const InterviewProvider: React.FC<InterviewProviderProps> = ({ children }
                 setCurrentSession(session);
                 setIsInterviewActive(true);
                 localStorage.setItem('cloudinterview-current-session', JSON.stringify(session));
-
-                // Get first question
-                // If the session already has questions (e.g. created with initial questions), use the current one
-                let questionResponse: InterviewQuestion | null = null;
-
-                if (session.questions && session.questions.length > 0 && session.currentQuestionIndex < session.questions.length) {
-                    questionResponse = session.questions[session.currentQuestionIndex];
-                } else {
-                    // Otherwise fetch next (this might increment index on backend, so be careful)
-                    questionResponse = await sessionApi.getNextQuestion(session.sessionId);
-                }
-
-                if (questionResponse) {
-                    setCurrentQuestion(questionResponse);
-                    setSessionHistory(prev => [...prev, {
-                        type: 'question',
-                        content: questionResponse,
-                        timestamp: new Date().toISOString()
-                    }]);
-                }
 
                 return session;
             } else {

@@ -51,6 +51,92 @@ export enum ExperienceLevel {
     PRINCIPAL = "principal"
 }
 
+export enum ProficiencyLevel {
+    BEGINNER = "beginner",
+    INTERMEDIATE = "intermediate",
+    ADVANCED = "advanced",
+    EXPERT = "expert"
+}
+
+export enum FeedbackStyle {
+    DETAILED = "detailed",
+    CONCISE = "concise",
+    ACTIONABLE = "actionable"
+}
+
+export enum AIResponseType {
+    QUESTION = "question",
+    FEEDBACK = "feedback",
+    HINT = "hint",
+    EVALUATION = "evaluation",
+    ENCOURAGEMENT = "encouragement"
+}
+
+export enum Sentiment {
+    POSITIVE = "positive",
+    NEUTRAL = "neutral",
+    NEGATIVE = "negative"
+}
+
+export interface STARResponse {
+    situation: string;
+    task: string;
+    action: string;
+    result: string;
+    reflection?: string;
+}
+
+export interface TestCase {
+    input: any;
+    expectedOutput: any;
+    description?: string;
+}
+
+export interface ComplexityAnalysis {
+    timeComplexity: string;
+    spaceComplexity: string;
+    explanation: string;
+}
+
+export interface CodeStyleIssue {
+    line: number;
+    column: number;
+    severity: "error" | "warning" | "info";
+    message: string;
+    rule: string;
+}
+
+export interface ExecutionResult {
+    success: boolean;
+    output: string;
+    error?: string;
+    executionTime: number;
+    memoryUsage: number;
+}
+
+export interface QuestionMetadata {
+    difficultyWeight: number;
+    popularity: number;
+    lastUpdated: string;
+    source?: string;
+    relatedQuestions: string[];
+}
+
+export interface GrowthTrajectory {
+    trend: "improving" | "stable" | "declining";
+    velocity: number;
+    confidence: number;
+}
+
+export interface BenchmarkComparison {
+    role: string;
+    categoryAverage: number;
+    topQuartile: number;
+    bottomQuartile: number;
+    difference: number;
+}
+
+// Core Entities
 export interface InterviewQuestion {
     questionId: string;
     type: QuestionType;
@@ -62,6 +148,19 @@ export interface InterviewQuestion {
     estimatedTime: number;
     followUpQuestions: string[];
     hints: string[];
+    metadata: QuestionMetadata;
+}
+
+export interface CodeSubmission {
+    submissionId: string;
+    challengeId: string;
+    language: ProgrammingLanguage;
+    code: string;
+    submittedAt: string;
+    executionResult?: ExecutionResult;
+    compilationErrors: string[];
+    styleIssues: CodeStyleIssue[];
+    complexityAnalysis?: string;
 }
 
 export interface InterviewAnswer {
@@ -71,19 +170,60 @@ export interface InterviewAnswer {
     answerText: string;
     submittedAt: string;
     responseTime: number;
-    codeSubmission?: {
-        language: ProgrammingLanguage;
-        code: string;
-        approachExplanation?: string;
-    };
+    codeSubmission?: CodeSubmission;
+    approachExplanation?: string;
+    starFormat?: STARResponse;
+    completenessScore?: number;
+    relevanceScore?: number;
+    communicationScore?: number;
 }
 
-export enum AIResponseType {
-    QUESTION = "question",
-    FEEDBACK = "feedback",
-    HINT = "hint",
-    EVALUATION = "evaluation",
-    ENCOURAGEMENT = "encouragement"
+export interface CodingChallenge extends InterviewQuestion {
+    description: string;
+    topics: string[];
+    timeLimit: number;
+    testCases: TestCase[];
+    starterCode: Record<string, string>;
+    optimalSolution: Record<string, string>;
+    complexityAnalysis: ComplexityAnalysis;
+    relatedChallenges: string[];
+    difficultyWeight: number;
+}
+
+export interface SkillAssessment {
+    skill: string;
+    score: number;
+    level: ProficiencyLevel;
+    confidence: number;
+    evidence: string[];
+    growthTrajectory: GrowthTrajectory;
+}
+
+export interface BehavioralAssessment {
+    competencies: Record<string, number>;
+    starQuality: number;
+    storytelling: number;
+    impactDemonstration: number;
+    selfAwareness: number;
+}
+
+export interface InterviewFeedback {
+    feedbackId: string;
+    sessionId: string;
+    overallScore: number;
+    summary: string;
+    technicalSkills?: SkillAssessment;
+    communication?: SkillAssessment;
+    problemSolving?: SkillAssessment;
+    domainKnowledge?: SkillAssessment;
+    behavioralCompetencies?: BehavioralAssessment;
+    strengths: string[];
+    improvementAreas: string[];
+    specificRecommendations: string[];
+    percentileRank?: number;
+    benchmarkComparison?: BenchmarkComparison;
+    generatedAt: string;
+    recommendation?: string;
 }
 
 export interface AIResponse {
@@ -93,20 +233,18 @@ export interface AIResponse {
     type: AIResponseType;
     content: string;
     generatedAt: string;
-    sentiment: "positive" | "neutral" | "negative";
+    sentiment: Sentiment;
     followUp: boolean;
+    responseTime: number;
+    confidence: number;
 }
 
-export interface InterviewFeedback {
-    feedbackId: string;
-    sessionId: string;
-    overallScore: number;
-    summary: string;
-    strengths: string[];
-    improvementAreas: string[];
-    specificRecommendations: string[];
-    generatedAt: string;
-    recommendation?: string;
+export interface ScenarioContext {
+    scenarioId: string;
+    description: string;
+    constraints: string[];
+    successCriteria: string[];
+    timeLimit: number;
 }
 
 export interface InterviewSession {
@@ -114,6 +252,9 @@ export interface InterviewSession {
     userId: string;
     mode: InterviewMode;
     jobType: string;
+    jobTitle?: string;
+    jobDescription?: string;
+    seniority?: ExperienceLevel;
     difficulty: Difficulty;
     status: InterviewStatus;
     createdAt: string;
@@ -124,15 +265,16 @@ export interface InterviewSession {
     questions: InterviewQuestion[];
     answers: InterviewAnswer[];
     aiResponses: AIResponse[];
-    jobTitle?: string;
-    jobDescription?: string;
-    seniority?: ExperienceLevel;
     feedback?: InterviewFeedback;
+    codingChallenge?: CodingChallenge;
+    codeSubmissions: CodeSubmission[];
+    scenarioContext?: ScenarioContext;
 }
 
 export interface CreateSessionRequest {
     mode: InterviewMode;
     jobType: string;
+    jobTitle?: string;
     difficulty?: Difficulty;
     duration?: number;
     language?: ProgrammingLanguage;
@@ -140,5 +282,27 @@ export interface CreateSessionRequest {
     topics?: string[];
     jobDescription?: string;
     seniority?: ExperienceLevel;
-    jobTitle?: string;
+}
+
+export interface SubmitAnswerRequest {
+    answerText: string;
+    codeSubmission?: {
+        language: ProgrammingLanguage;
+        code: string;
+        approachExplanation?: string;
+    };
+    responseTime?: number;
+}
+
+export interface ApiResponse<T> {
+    success: boolean;
+    data?: T;
+    error?: ApiError;
+}
+
+export interface ApiError {
+    code: string;
+    message: string;
+    details?: Record<string, any>;
+    timestamp: string;
 }
