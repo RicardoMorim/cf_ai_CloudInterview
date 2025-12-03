@@ -336,6 +336,33 @@ export class InterviewSessionDO {
         });
       }
 
+      if (path === "/update-state" && request.method === "POST") {
+        const body = await request.json() as any;
+
+        if (!this.session) {
+          return new Response(JSON.stringify({ success: false, error: "No session found" }), {
+            status: 404,
+            headers: { "Content-Type": "application/json" }
+          });
+        }
+
+        // Update currentCode if provided
+        if (body.currentCode !== undefined) {
+          (this.session as any).currentCode = body.currentCode;
+        }
+
+        // Update any other state fields as needed
+        if (body.state) {
+          Object.assign(this.session, body.state);
+        }
+
+        await this.saveSession();
+
+        return new Response(JSON.stringify({ success: true, session: this.session }), {
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+
       if (path === "/transcript" && request.method === "GET") {
         const result = await this.getTranscript();
         return new Response(JSON.stringify({ success: true, ...result }), {
