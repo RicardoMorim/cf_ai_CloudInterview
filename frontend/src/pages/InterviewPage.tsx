@@ -11,6 +11,8 @@ import './InterviewPage.css';
 import { Link, useNavigate } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import { InterviewQuestion, ProgrammingLanguage } from '../types';
+import { useHints } from '../features/interview/hooks/useHints';
+import { useAnswerSubmission } from '../features/interview/hooks/useAnswerSubmission';
 
 const InterviewPage: React.FC = () => {
     const navigate = useNavigate();
@@ -26,9 +28,6 @@ const InterviewPage: React.FC = () => {
     } = useInterview();
     const { isDark } = useTheme();
 
-    const [answerText, setAnswerText] = useState('');
-    const [hintsRevealed, setHintsRevealed] = useState(0);
-
     // Use custom hooks
     const timeRemaining = useTimer(isInterviewActive);
     const {
@@ -43,6 +42,8 @@ const InterviewPage: React.FC = () => {
             updateState({ currentCode: code, currentLanguage: lang });
         }
     });
+    const { hintsRevealed, visibleHints, hasMoreHints, revealNextHint } = useHints(currentQuestion);
+
 
     // Voice Interface Integration
     const handleVoiceTranscript = useCallback((text: string) => {
@@ -61,6 +62,18 @@ const InterviewPage: React.FC = () => {
         sessionId: currentSession?.sessionId,
         onTranscript: handleVoiceTranscript,
         code: codeContent // Pass current code to voice interface
+    });
+
+    const { answerText, setAnswerText, handleSubmit } = useAnswerSubmission({
+        currentQuestion,
+        codeContent,
+        selectedLanguage,
+        onSubmit: async (data) => {
+            await submitAnswer(data);
+            setCodeContent(''); // Clear code after submission
+        },
+        onStopListening: stopListening,
+        isListening
     });
 
     // Trigger initial greeting
@@ -86,40 +99,6 @@ const InterviewPage: React.FC = () => {
         }
     }, [sessionHistory, speak]);
 
-    // Reset hints when question changes
-    useEffect(() => {
-        setHintsRevealed(0);
-    }, [currentQuestion?.questionId]);
-
-    const handleSubmit = async (e?: React.FormEvent) => {
-        if (e) e.preventDefault();
-        if (!answerText.trim() && !codeContent.trim()) return;
-
-        // Stop listening if active
-        if (isListening) stopListening();
-
-        try {
-            const answerData: any = {
-                answerText: answerText.trim(),
-                responseTime: 60, // TODO: Calculate actual response time
-            };
-
-            // Add code content if this is a coding question
-            if (currentQuestion?.type === 'coding' && codeContent.trim()) {
-                answerData.codeSubmission = {
-                    language: selectedLanguage,
-                    code: codeContent.trim(),
-                    approachExplanation: answerText.trim()
-                };
-            }
-
-            await submitAnswer(answerData);
-            setAnswerText('');
-            setCodeContent('');
-        } catch (error) {
-            console.error('Failed to submit answer:', error);
-        }
-    };
 
     const handleVoiceInput = () => {
         if (isListening) {
@@ -206,10 +185,10 @@ const InterviewPage: React.FC = () => {
                                 <div className="question-hints">
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                                         <h5>Hints ({hintsRevealed}/{currentQuestion.hints.length})</h5>
-                                        {hintsRevealed < currentQuestion.hints.length && (
+                                        {hasMoreHints && (
                                             <button
                                                 className="button secondary"
-                                                onClick={() => setHintsRevealed(prev => prev + 1)}
+                                                onClick={() => revealNextHint()}
                                                 style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}
                                             >
                                                 Show Next Hint
