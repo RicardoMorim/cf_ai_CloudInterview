@@ -13,6 +13,7 @@ import ReactMarkdown from 'react-markdown';
 import { InterviewQuestion, ProgrammingLanguage } from '../types';
 import { useHints } from '../features/interview/hooks/useHints';
 import { useAnswerSubmission } from '../features/interview/hooks/useAnswerSubmission';
+import { InterviewHeader } from '../features/interview/components/InterviewHeader';
 
 const InterviewPage: React.FC = () => {
     const navigate = useNavigate();
@@ -143,27 +144,11 @@ const InterviewPage: React.FC = () => {
     return (
         <div className="interview-page">
             <div className="interview-container">
-                {/* Interview Header */}
-                <div className="interview-header">
-                    <div className="interview-info">
-                        <h1>AI Interview</h1>
-                        <div className="interview-meta">
-                            <span className="interview-mode">
-                                {currentSession?.mode === 'technical' ? React.createElement(FiCode as any, { className: "mode-icon" }) : React.createElement(FiCpu as any, { className: "mode-icon" })}
-                                {currentSession?.mode}
-                            </span>
-                            <span className="interview-job">{currentSession?.jobType}</span>
-                            <span className="interview-difficulty">
-                                {currentSession?.difficulty}
-                            </span>
-                        </div>
-                    </div>
-
-                    <div className="interview-timer">
-                        {React.createElement(FiClock as any, { className: "timer-icon" })}
-                        <span>{timeRemaining !== null ? formatTime(timeRemaining) : '---'}</span>
-                    </div>
-                </div>
+                <InterviewHeader
+                    session={currentSession}
+                    timeRemaining={timeRemaining}
+                    formatTime={formatTime}
+                />
 
                 {/* Interview Content */}
                 <div className="interview-content">
