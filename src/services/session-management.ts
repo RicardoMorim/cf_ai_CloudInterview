@@ -1,7 +1,9 @@
-﻿// Interview Session Management Service using Durable Objects
+﻿// Interview Session Management - Durable Object
+// Simplified to focus on DO lifecycle, delegating business logic to services
 
-import { InterviewSession, InterviewQuestion, InterviewAnswer, AIResponse, InterviewMode, InterviewStatus, Difficulty, QuestionType, Sentiment, AIResponseType, ExperienceLevel, Essentials, Problem, LeetCodeProblem } from "../types";
-import { InterviewSessionRepository } from "./interfaces";
+import { InterviewSession, InterviewQuestion, InterviewAnswer, AIResponse, InterviewMode, InterviewStatus, Difficulty, QuestionType } from "../types";
+import { QuestionSelector } from "./questions/questionSelector";
+import { SessionActions } from "./session/sessionActions";
 
 interface Env {
   SESSION_NAMESPACE: DurableObjectNamespace;
@@ -9,6 +11,10 @@ interface Env {
   AI: any;
 }
 
+/**
+ * Interview Session Durable Object
+ * Handles session lifecycle and state persistence
+ */
 export class InterviewSessionDO {
   private state: DurableObjectState;
   private env: Env;
@@ -19,7 +25,7 @@ export class InterviewSessionDO {
     this.state = state;
     this.env = env;
 
-    // Wait for the state to be ready
+    // Load session data on initialization
     this.state.blockConcurrencyWhile(async () => {
       console.log("DO: Loading session data...");
       await this.loadSession();
@@ -29,6 +35,10 @@ export class InterviewSessionDO {
     // Set up automatic cleanup for expired sessions
     this.setupSessionCleanup();
   }
+
+  // ==================
+  // LIFECYCLE METHODS
+  // ==================
 
   private async loadSession(): Promise<void> {
     const sessionData = await this.state.storage.get<InterviewSession>("session");
@@ -59,7 +69,10 @@ export class InterviewSessionDO {
     }, 5 * 60 * 1000); // 5 minutes
   }
 
-  // Start a new interview session
+  // ==================
+  // SESSION OPERATIONS
+  // ==================
+
   async startSession(
     userId: string,
     mode: InterviewMode,
@@ -75,11 +88,11 @@ export class InterviewSessionDO {
     }
 
     const now = new Date().toISOString();
-    let selectedQuestions: InterviewQuestion[] = [];
 
     // Use QuestionSelector service for question selection
-    const questionSelector = new (await import("./questions/questionSelector")).QuestionSelector(this.env);
+    const questionSelector = new QuestionSelector(this.env);
 
+    let selectedQuestions: InterviewQuestion[] = [];
     if (mode === InterviewMode.TECHNICAL) {
       selectedQuestions = await questionSelector.selectTechnicalQuestions(
         jobType,
@@ -107,9 +120,9 @@ export class InterviewSessionDO {
       difficulty,
       jobDescription,
       seniority: seniority as any,
-      status: InterviewStatus.IN_PROGRESS, // Start immediately, not PENDING
+      status: InterviewStatus.IN_PROGRESS,
       createdAt: now,
-      startedAt: now, // Set startedAt to now since we're starting immediately
+      startedAt: now,
       completedAt: null,
       duration: 0,
       currentQuestionIndex: 0,
@@ -126,7 +139,110 @@ export class InterviewSessionDO {
     return this.session;
   }
 
-  // Begin the interview
+  async getCurrentQuestion(): Promise<InterviewQuestion | null> {
+    if (!this.session) {
+      throw new Error("No session found");
+    }
+
+    if (this.session.currentQuestionIndex >= this.session.questions.length) {
+      return null;
+    }
+
+    return this.session.questions[this.session.currentQuestionIndex];
+  }
+
+  async submitAnswer(answer: InterviewAnswer): Promise<{
+    session: InterviewSession;
+    answer: InterviewAnswer;
+  }> {
+    if (!this.session) {
+      throw new Error("No session found");
+    }
+
+    const result = await SessionActions.submitAnswer(this.session, answer);
+    await this.saveSession();
+    return result;
+  }
+
+  async nextQuestion(): Promise<{
+    question: InterviewQuestion | null;
+    session: InterviewSession;
+  }> {
+    if (!this.session) {
+      throw new Error("No session found");
+    }
+
+    const result = await SessionActions.nextQuestion(this.session);
+    await this.saveSession();
+    return result;
+  }
+
+  async completeSession(): Promise<InterviewSession> {
+    if (!this.session) {
+      throw new Error("No session found");
+    }
+
+    this.session = await SessionActions.completeSession(this.session, this.env.AI);
+    await this.saveSession();
+    return this.session;
+  }
+
+  async processChatMessage(userMessage: string): Promise<{
+    response: string;
+    session: InterviewSession;
+  }> {
+    if (!this.session) {
+      throw new Error("No session found");
+    }
+
+    const result = await SessionActions.processChatMessage(this.session, userMessage, this.env.AI);
+    await this.saveSession();
+    return result;
+  }
+
+  async getTranscript(): Promise<{
+    session: InterviewSession;
+    transcript: Array<any>;
+  }> {
+    if (!this.session) {
+      throw new Error("No session found");
+    }
+
+    const transcript = SessionActions.buildTranscript(this.session);
+    return { session: this.session, transcript };
+  }
+
+  async addAIResponse(response: AIResponse): Promise<void> {
+    if (!this.session) {
+      throw new Error("No session found");
+    }
+
+    this.session.aiResponses.push(response);
+    await this.saveSession();
+  }
+
+  async addQuestions(questions: InterviewQuestion[]): Promise<void> {
+    if (!this.session) {
+      throw new Error("No session found");
+    }
+
+    this.session.questions = questions;
+    await this.saveSession();
+  }
+
+  async addFeedback(feedback: any): Promise<void> {
+    if (!this.session) {
+      throw new Error("No session found");
+    }
+
+    this.session.feedback = feedback;
+    await this.saveSession();
+  }
+
+  async getSession(): Promise<InterviewSession | null> {
+    return this.session;
+  }
+
   async beginSession(): Promise<InterviewSession> {
     if (!this.session) {
       throw new Error("No session found");
@@ -141,663 +257,5 @@ export class InterviewSessionDO {
 
     await this.saveSession();
     return this.session;
-  }
-
-  // Add questions to the session
-  async addQuestions(questions: InterviewQuestion[]): Promise<void> {
-    if (!this.session) {
-      throw new Error("No session found");
-    }
-
-    this.session.questions = questions;
-    await this.saveSession();
-  }
-
-  // Get the current question
-  async getCurrentQuestion(): Promise<InterviewQuestion | null> {
-    if (!this.session) {
-      throw new Error("No session found");
-    }
-
-    console.log(this.session.questions.length + " questions");
-    console.log(this.session.currentQuestionIndex + " current question index");
-    if (this.session.currentQuestionIndex >= this.session.questions.length) {
-      return null;
-    }
-
-    console.log(this.session.questions[this.session.currentQuestionIndex]);
-
-    return this.session.questions[this.session.currentQuestionIndex];
-  }
-
-  // Submit an answer
-  async submitAnswer(answer: InterviewAnswer): Promise<{
-    session: InterviewSession;
-    answer: InterviewAnswer;
-  }> {
-    if (!this.session) {
-      throw new Error("No session found");
-    }
-
-    if (this.session.status !== InterviewStatus.IN_PROGRESS) {
-      throw new Error("Session not in progress");
-    }
-
-    // Add the answer to the session
-    this.session.answers.push(answer);
-
-    // Update session duration
-    if (this.session.startedAt) {
-      const now = new Date();
-      const start = new Date(this.session.startedAt);
-      this.session.duration = Math.floor((now.getTime() - start.getTime()) / 1000);
-    }
-
-    await this.saveSession();
-
-    return {
-      session: this.session,
-      answer
-    };
-  }
-
-  // Add AI response
-  async addAIResponse(response: AIResponse): Promise<void> {
-    if (!this.session) {
-      throw new Error("No session found");
-    }
-
-    this.session.aiResponses.push(response);
-    await this.saveSession();
-  }
-
-  // Move to next question
-  async nextQuestion(): Promise<{
-    question: InterviewQuestion | null;
-    session: InterviewSession;
-  }> {
-    if (!this.session) {
-      throw new Error("No session found");
-    }
-
-    this.session.currentQuestionIndex++;
-    await this.saveSession();
-
-    const question = await this.getCurrentQuestion();
-    return {
-      question,
-      session: this.session
-    };
-  }
-
-  // Complete the session and generate feedback
-  async completeSession(): Promise<InterviewSession> {
-    if (!this.session) {
-      throw new Error("No session found");
-    }
-
-    this.session.status = InterviewStatus.COMPLETED;
-    this.session.completedAt = new Date().toISOString();
-
-    // Update duration
-    if (this.session.startedAt) {
-      const now = new Date();
-      const start = new Date(this.session.startedAt);
-      this.session.duration = Math.floor((now.getTime() - start.getTime()) / 1000);
-    }
-
-    // Generate Final Feedback if not already present
-    if (!this.session.feedback) {
-      try {
-        const summaryPrompt = `
-          Generate a final interview summary for the candidate based on these answers:
-          ${JSON.stringify(this.session.answers.map((a: any) => ({ q: a.questionId, a: a.answerText, score: a.evaluation?.score })))}
-          
-          Return JSON:
-          - overallScore: 0-100
-          - summary: Executive summary of performance.
-          - strengths: List of strings.
-          - improvementAreas: List of strings.
-          - specificRecommendations: List of strings (actionable advice).
-          - recommendation: "Hire", "No Hire", "Strong Hire", "Leaning No Hire".
-        `;
-
-        const aiResponse = await this.env.AI.run("@cf/meta/llama-3.3-70b-instruct-fp8-fast", {
-          messages: [{ role: "user", content: summaryPrompt }],
-          temperature: 0.4,
-          max_tokens: 1500
-        });
-
-        let responseText = "";
-        if (aiResponse) {
-          if (typeof aiResponse.response === 'string') {
-            responseText = aiResponse.response;
-          } else if (typeof aiResponse === 'string') {
-            responseText = aiResponse;
-          } else if (aiResponse.result && typeof aiResponse.result.response === 'string') {
-            responseText = aiResponse.result.response;
-          }
-        }
-
-        const cleanResponse = responseText.replace(/```json|```/g, '').trim();
-        const feedbackData = JSON.parse(cleanResponse);
-
-        this.session.feedback = {
-          feedbackId: `fb_${Date.now()}`,
-          sessionId: this.session.sessionId,
-          overallScore: feedbackData.overallScore || 0,
-          summary: feedbackData.summary || "No summary generated.",
-          strengths: feedbackData.strengths || [],
-          improvementAreas: feedbackData.improvementAreas || [],
-          specificRecommendations: feedbackData.specificRecommendations || [],
-          generatedAt: new Date().toISOString()
-        };
-      } catch (e) {
-        console.error("DO: Failed to generate final feedback:", e);
-        this.session.feedback = {
-          feedbackId: `fb_err_${Date.now()}`,
-          sessionId: this.session.sessionId,
-          overallScore: 70,
-          summary: "Interview completed. Feedback generation failed.",
-          strengths: [],
-          improvementAreas: [],
-          specificRecommendations: [],
-          generatedAt: new Date().toISOString()
-        };
-      }
-    }
-
-    await this.saveSession();
-
-    // Clean up timer
-    if (this.timerId) {
-      clearInterval(this.timerId);
-      this.timerId = null;
-    }
-
-    return this.session;
-  }
-
-  // Handle chat interactions (greeting, during interview, post-interview)
-  async chat(message: string, action?: string, code?: string): Promise<{ response: string; session: InterviewSession }> {
-    if (!this.session) {
-      throw new Error("No session found");
-    }
-
-    let context = "";
-    const currentQ = this.session.questions[this.session.currentQuestionIndex];
-
-    if (action === 'greeting') {
-      context = `
-            You are an AI interviewer named Alex.
-            The candidate has just started the interview.
-            
-            Job Role: ${this.session.jobType}
-            Difficulty: ${this.session.difficulty}
-            
-            First Question Title: ${currentQ ? currentQ.title : "Introduction"}
-            
-            Task: Welcome the candidate warmly and introduce the first problem briefly.
-            Do not solve the problem, just introduce it.
-            Keep it under 3 sentences.
-            Be professional but encouraging.
-        `;
-    } else if (this.session.status === InterviewStatus.IN_PROGRESS || this.session.status === InterviewStatus.PENDING) {
-      context = `
-            You are an AI interviewer named Alex conducting a technical interview.
-            
-            Job Role: ${this.session.jobType}
-            Current Question: ${currentQ ? JSON.stringify(currentQ) : "General Discussion"}
-            
-            ${code ? `Candidate's Current Code:\n\`\`\`\n${code}\n\`\`\`\n` : ''}
-            
-            Candidate says: "${message}"
-            
-            Task: Respond to the candidate. 
-            - If they are asking for clarification, provide it without giving away the solution.
-            - If they are stuck, provide a subtle hint${code ? ' based on their code' : ''}.
-            - If they are just thinking aloud, encourage them.
-            - Keep responses concise and helpful.
-        `;
-    } else {
-      // Post-interview context
-      context = `
-          You are a helpful AI assistant discussing the results of a technical interview with the candidate.
-          
-          Interview Context:
-          Job: ${this.session.jobType}
-          Difficulty: ${this.session.difficulty}
-          Feedback: ${JSON.stringify(this.session.feedback)}
-          
-          Candidate's Question: "${message}"
-          
-          Answer the candidate's question helpfully and encouragingly. refer to specific parts of their performance if possible.
-        `;
-    }
-
-    let aiResponseText = "";
-    try {
-      const aiResponse = await this.env.AI.run("@cf/meta/llama-3.3-70b-instruct-fp8-fast", {
-        messages: [{ role: "user", content: context }],
-        temperature: 0.7,
-        max_tokens: 800
-      });
-
-      if (aiResponse) {
-        if (typeof aiResponse.response === 'string') {
-          aiResponseText = aiResponse.response;
-        } else if (typeof aiResponse === 'string') {
-          aiResponseText = aiResponse;
-        } else if (aiResponse.result && typeof aiResponse.result.response === 'string') {
-          aiResponseText = aiResponse.result.response;
-        }
-      }
-    } catch (e) {
-      console.error("DO: Chat generation failed:", e);
-      aiResponseText = "I'm sorry, I'm having trouble processing your request right now.";
-    }
-
-    // Store the interaction
-    this.session.aiResponses.push({
-      responseId: `chat_${Date.now()}`,
-      sessionId: this.session.sessionId,
-      questionId: "chat",
-      type: AIResponseType.ENCOURAGEMENT,
-      content: aiResponseText,
-      generatedAt: new Date().toISOString(),
-      sentiment: Sentiment.NEUTRAL,
-      followUp: false,
-      responseTime: 0,
-      confidence: 1
-    });
-
-    await this.saveSession();
-
-    return {
-      response: aiResponseText,
-      session: this.session
-    };
-  }
-
-  // Add feedback to the session
-  async addFeedback(feedback: any): Promise<void> {
-    if (!this.session) {
-      throw new Error("No session found");
-    }
-
-    this.session.feedback = feedback;
-    await this.saveSession();
-  }
-
-  // Get session transcript
-  async getTranscript(): Promise<{
-    session: InterviewSession;
-    transcript: Array<{
-      type: "question" | "answer" | "ai_response";
-      content: string;
-      timestamp: string;
-      metadata?: any;
-    }>;
-  }> {
-    if (!this.session) {
-      throw new Error("No session found");
-    }
-
-    const transcript: Array<{
-      type: "question" | "answer" | "ai_response";
-      content: string;
-      timestamp: string;
-      metadata?: any;
-    }> = [];
-
-    // Add questions and answers
-    for (let i = 0; i < this.session.questions.length; i++) {
-      const question = this.session.questions[i];
-      const answer = this.session.answers.find(a => a.questionId === question.questionId);
-
-      transcript.push({
-        type: "question",
-        content: question.text,
-        timestamp: new Date(question.questionId).toISOString(), // This would need proper timestamping
-        metadata: { questionType: question.type, difficulty: question.difficulty }
-      });
-
-      if (answer) {
-        transcript.push({
-          type: "answer",
-          content: answer.answerText,
-          timestamp: answer.submittedAt,
-          metadata: {
-            responseTime: answer.responseTime,
-            scores: {
-              completeness: answer.completenessScore,
-              relevance: answer.relevanceScore,
-              communication: answer.communicationScore
-            }
-          }
-        });
-      }
-    }
-
-    // Add AI responses
-    this.session.aiResponses.forEach(response => {
-      transcript.push({
-        type: "ai_response",
-        content: response.content,
-        timestamp: response.generatedAt,
-        metadata: {
-          responseType: response.type,
-          sentiment: response.sentiment
-        }
-      });
-    });
-
-    // Sort by timestamp
-    transcript.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-
-    return {
-      session: this.session,
-      transcript
-    };
-  }
-
-  async fetch(request: Request): Promise<Response> {
-    const url = new URL(request.url);
-    const path = url.pathname;
-    console.log(`DO: Handling fetch request for path: ${path}`);
-
-    try {
-      switch (path) {
-        case "/start":
-          if (request.method !== "POST") {
-            return new Response("Method Not Allowed", { status: 405 });
-          }
-          const { userId, mode, jobType, difficulty, estimatedDuration, sessionId, jobTitle, jobDescription, seniority } = await request.json() as any;
-          await this.startSession(userId, mode, jobType, difficulty, estimatedDuration, jobTitle, jobDescription, seniority);
-          if (sessionId) {
-            this.session!.sessionId = sessionId;
-            await this.saveSession();
-          }
-          return new Response(JSON.stringify({ success: true, session: this.session }), {
-            headers: { "Content-Type": "application/json" }
-          });
-
-        case "/begin":
-          if (request.method !== "POST") {
-            return new Response("Method Not Allowed", { status: 405 });
-          }
-          await this.beginSession(); // Actually begin the session!
-          const firstQuestion = await this.getCurrentQuestion();
-          return new Response(JSON.stringify({ success: true, question: firstQuestion, session: this.session }), {
-            headers: { "Content-Type": "application/json" }
-          });
-
-        case "/answer": {
-          if (request.method !== "POST") {
-            return new Response("Method Not Allowed", { status: 405 });
-          }
-          const answerData = await request.json() as any;
-
-          if (!this.session) {
-            return new Response(JSON.stringify({ success: false, error: "Session not found" }), { status: 404 });
-          }
-
-          const currentQ = this.session.questions[this.session.currentQuestionIndex];
-          const answerId = `ans_${Date.now()}`;
-
-          // Construct full answer object
-          const fullAnswer: InterviewAnswer = {
-            answerId,
-            sessionId: this.session.sessionId,
-            questionId: currentQ.questionId,
-            answerText: answerData.answerText || "",
-            submittedAt: new Date().toISOString(),
-            responseTime: answerData.responseTime || 0,
-            codeSubmission: answerData.codeSubmission,
-            approachExplanation: answerData.codeSubmission?.approachExplanation,
-            completenessScore: 0,
-            relevanceScore: 0,
-            communicationScore: 0
-          };
-
-          // 1. Submit the answer (save to state)
-          await this.submitAnswer(fullAnswer);
-
-          // 2. Evaluate with AI
-          let aiResponseData: AIResponse | null = null;
-          try {
-            const evaluationPrompt = `
-              You are an expert technical interviewer. Evaluate the candidate's answer to the following question.
-              
-              CRITICAL: RESPOND IN ENGLISH ONLY. DO NOT USE PORTUGUESE OR ANY OTHER LANGUAGE.
-              
-              Question: ${currentQ.text}
-              Type: ${currentQ.type}
-              Difficulty: ${currentQ.difficulty}
-              
-              Candidate Answer: ${fullAnswer.answerText}
-              ${fullAnswer.codeSubmission ? `Candidate Code (${fullAnswer.codeSubmission.language}):\n${fullAnswer.codeSubmission.code}` : ''}
-              
-              Provide a JSON response with:
-              - feedback: Brief feedback (2-3 sentences max, in English). Say "Good work! Moving to the next question." if answer is acceptable.
-              - score: 0-100 score.
-              - sentiment: "positive", "neutral", or "negative".
-              - followUp: false (we're moving to next question, not doing follow-ups).
-              
-              IMPORTANT: Keep feedback VERY brief. DO NOT provide detailed explanations. RESPOND IN ENGLISH ONLY.
-            `;
-
-            const aiGenResponse = await this.env.AI.run("@cf/meta/llama-3.3-70b-instruct-fp8-fast", {
-              messages: [
-                {
-                  role: "system",
-                  content: "You are a technical interviewer. You MUST respond ONLY in English. Never use Portuguese or any other language. All responses must be in English."
-                },
-                {
-                  role: "user",
-                  content: evaluationPrompt
-                }
-              ],
-              temperature: 0.3, // Lower temperature for more deterministic English responses
-              max_tokens: 300
-            });
-
-            let responseText = "";
-            if (aiGenResponse) {
-              if (typeof aiGenResponse.response === 'string') {
-                responseText = aiGenResponse.response;
-              } else if (typeof aiGenResponse === 'string') {
-                responseText = aiGenResponse;
-              } else if (aiGenResponse.result && typeof aiGenResponse.result.response === 'string') {
-                responseText = aiGenResponse.result.response;
-              }
-            }
-
-            const cleanResponse = responseText.replace(/```json|```/g, '').trim();
-            const evaluation = JSON.parse(cleanResponse);
-
-            // Create AI Response object
-            aiResponseData = {
-              responseId: `resp_${Date.now()}`,
-              sessionId: this.session.sessionId,
-              questionId: currentQ.questionId,
-              type: AIResponseType.FEEDBACK,
-              content: evaluation.feedback,
-              generatedAt: new Date().toISOString(),
-              sentiment: evaluation.sentiment as Sentiment || Sentiment.NEUTRAL,
-              followUp: evaluation.followUp || false,
-              responseTime: 0,
-              confidence: 1
-            };
-
-            // Save AI response
-            await this.addAIResponse(aiResponseData);
-
-          } catch (aiError) {
-            console.error("DO: AI evaluation failed:", aiError);
-            // Fallback response
-            aiResponseData = {
-              responseId: `resp_${Date.now()}`,
-              sessionId: this.session.sessionId,
-              questionId: currentQ.questionId,
-              type: AIResponseType.FEEDBACK,
-              content: "Thank you for your answer. Let's proceed.",
-              generatedAt: new Date().toISOString(),
-              sentiment: Sentiment.NEUTRAL,
-              followUp: false,
-              responseTime: 0,
-              confidence: 1
-            };
-            await this.addAIResponse(aiResponseData);
-          }
-
-          // 3. Move to next question or complete interview
-          this.session.currentQuestionIndex++;
-          await this.saveSession();
-
-          let nextQuestion: InterviewQuestion | null = null;
-          if (this.session.currentQuestionIndex < this.session.questions.length) {
-            // More questions available
-            nextQuestion = this.session.questions[this.session.currentQuestionIndex];
-          } else {
-            // No more questions - complete the interview automatically
-            console.log("DO: No more questions, completing interview");
-            await this.completeSession();
-          }
-
-          return new Response(JSON.stringify({
-            success: true,
-            session: this.session,
-            aiResponse: aiResponseData,
-            nextQuestion: nextQuestion
-          }), {
-            headers: { "Content-Type": "application/json" }
-          });
-        }
-
-        case "/next":
-          const nextResult = await this.nextQuestion();
-          return new Response(JSON.stringify({ success: true, ...nextResult }), {
-            headers: { "Content-Type": "application/json" }
-          });
-
-        case "/end":
-          if (request.method !== "POST") {
-            return new Response("Method Not Allowed", { status: 405 });
-          }
-          const completedSession = await this.completeSession();
-          return new Response(JSON.stringify({ success: true, session: completedSession }), {
-            headers: { "Content-Type": "application/json" }
-          });
-
-        case "/chat":
-          if (request.method !== "POST") {
-            return new Response("Method Not Allowed", { status: 405 });
-          }
-          const chatBody = await request.json() as any;
-          const chatResult = await this.chat(chatBody.message, chatBody.action, chatBody.code);
-          return new Response(JSON.stringify({ success: true, ...chatResult }), {
-            headers: { "Content-Type": "application/json" }
-          });
-
-        case "/state":
-          console.log("DO: Getting state, currentCode length:", (this.session as any)?.currentCode?.length || 0);
-          return new Response(JSON.stringify({ success: true, session: this.session }), {
-            headers: { "Content-Type": "application/json" }
-          });
-
-        case "/update-state":
-          if (request.method !== "POST") {
-            return new Response("Method Not Allowed", { status: 405 });
-          }
-          const updates = await request.json() as any;
-          console.log("DO: Updating state with:", updates);
-          if (this.session) {
-            this.session = { ...this.session, ...updates };
-            console.log("DO: Session after update, currentCode length:", (this.session as any).currentCode?.length || 0);
-            await this.saveSession();
-          }
-          return new Response(JSON.stringify({ success: true, session: this.session }), {
-            headers: { "Content-Type": "application/json" }
-          });
-
-        case "/question/current":
-          const currentQ = await this.getCurrentQuestion();
-          return new Response(JSON.stringify({ success: true, question: currentQ, session: this.session }), {
-            headers: { "Content-Type": "application/json" }
-          });
-
-        case "/add-interaction":
-          if (request.method !== "POST") {
-            return new Response("Method Not Allowed", { status: 405 });
-          }
-          const { userText, aiText } = await request.json() as any;
-
-          // Store AI response
-          if (aiText && this.session) {
-            this.session.aiResponses.push({
-              responseId: crypto.randomUUID(),
-              sessionId: this.session.sessionId,
-              type: AIResponseType.ENCOURAGEMENT, // Defaulting to encouragement/chat
-              content: aiText,
-              generatedAt: new Date().toISOString(),
-              sentiment: Sentiment.NEUTRAL,
-              followUp: false,
-              responseTime: 0,
-              confidence: 1
-            });
-            await this.saveSession();
-          }
-
-          return new Response(JSON.stringify({ success: true }), {
-            headers: { "Content-Type": "application/json" }
-          });
-
-        default:
-          return new Response("Not Found", { status: 404 });
-      }
-    } catch (error) {
-      console.error("DO: Error handling request:", error);
-      return new Response(JSON.stringify({
-        success: false,
-        error: {
-          message: error instanceof Error ? error.message : "Unknown error",
-          timestamp: new Date().toISOString()
-        }
-      }), {
-        status: 500,
-        headers: { "Content-Type": "application/json" }
-      });
-    }
-  }
-}
-
-export class SessionManager {
-  private namespace: DurableObjectNamespace;
-
-  constructor(namespace: DurableObjectNamespace) {
-    this.namespace = namespace;
-  }
-
-  getSessionStub(sessionId: string): DurableObjectStub {
-    const id = this.namespace.idFromName(sessionId);
-    return this.namespace.get(id);
-  }
-
-  async createSession(userId: string, mode: InterviewMode, jobType: string, difficulty: Difficulty, estimatedDuration: number = 45, jobTitle?: string, jobDescription?: string, seniority?: string): Promise<{ sessionId: string, session: InterviewSession }> {
-    const sessionId = crypto.randomUUID();
-    const stub = this.getSessionStub(sessionId);
-    const response = await stub.fetch("http://internal/start", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId, mode, jobType, difficulty, estimatedDuration, sessionId, jobTitle, jobDescription, seniority })
-    });
-
-    if (!response.ok) {
-      throw new Error("Failed to create session");
-    }
-
-    const data = await response.json() as any;
-    return { sessionId, session: data.session };
   }
 }
