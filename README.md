@@ -81,15 +81,38 @@ CloudInterview is a modern, AI-driven platform designed to help developers pract
 
 ## 📖 Documentation
 
-Detailed documentation is available in the `docs/` directory:
+ Comprehensive documentation is available in the `docs/` directory:
 
--   [Architecture Overview](docs/architecture.puml)
--   [Interview Flow Sequence](docs/sequence_diagram.puml)
--   [API Documentation](docs/api-architecture.md)
+-   **[Getting Started Guide](docs/getting-started/installation.md)** - Installation and setup
+-   **[API Documentation](docs/api/endpoints.md)** - Complete API reference
+-   **[Architecture Overview](docs/architecture/overview.md)** - System design and decisions
+-   **[Documentation Index](docs/README.md)** - Full documentation navigation
 
-## 🤝 Contributing
+**Visual Diagrams:**
+-   [System Architecture](docs/high-level%20overview/architecture.puml)
+-   [Interview Flow Sequence](docs/sequence-diagram/sequence_diagram.puml)
+-   [Class Diagram](docs/class%20diagram/diagram.puml)
 
-Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md) for details.
+---
+
+## 🎯 For Cloudflare Reviewers
+
+This project demonstrates:
+
+✅ **LLM Integration:** Llama 3.3 70B for question selection, evaluation, and feedback  
+✅ **Workflow Coordination:** Durable Objects for stateful session management  
+✅ **User Input:** Chat and voice (Whisper STT)  
+✅ **Memory/State:** Durable Objects + KV storage  
+
+**Quick Links:**
+- [PROMPTS.md](PROMPTS.md) - 29 documented AI prompts
+- [API Docs](docs/api/endpoints.md) - REST API reference
+- [Architecture](docs/architecture/overview.md) - Cloudflare stack usage
+- [Getting Started](docs/getting-started/installation.md) - Run locally
+
+**Repository:** `cf_ai_CloudInterview` ✅ (correctly prefixed)
+
+---
 
 ## 📄 License
 

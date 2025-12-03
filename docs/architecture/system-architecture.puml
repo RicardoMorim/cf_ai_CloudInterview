@@ -1,0 +1,102 @@
+@startuml
+!theme vibrant
+title CloudInterview - System Architecture
+
+package "Frontend (React + TypeScript)" {
+  component [Interview Page] as UI
+  component [Monaco Code Editor] as Editor
+  component [Voice Interface] as Voice
+  component [Session History] as History
+  
+  UI --> Editor
+  UI --> Voice
+  UI --> History
+}
+
+package "Cloudflare Workers" {
+  component [Hono Router] as Router
+  component [CORS Middleware] as CORS
+  component [Error Handler] as ErrorMW
+  
+  package "Services" {
+    component [AI Interviewer] as AIInt
+    component [AI Evaluator] as AIEval
+    component [AI Generator] as AIGen
+    component [Question Selector] as QSelect
+    component [Session Actions] as SAction
+    component [Session State Mgr] as SState
+  }
+  
+  Router --> CORS
+  Router --> ErrorMW
+  Router --> AIInt
+  Router --> AIEval
+  Router --> AIGen
+  Router --> QSelect
+  Router --> SAction
+  Router --> SState
+}
+
+package "Durable Objects" {
+  component [Interview Session DO] as SessionDO
+  database [DO Storage] as DOStorage
+  
+  SessionDO --> DOStorage : persist state
+  SessionDO --> QSelect : select questions
+  SessionDO --> SAction : business logic
+  SessionDO --> SState : state updates
+}
+
+package "Cloudflare Services" {
+  database "KV Storage" {
+    [Questions DB\n(3000+ problems)] as KV
+  }
+  
+  cloud "Workers AI" {
+    [Llama 3.3 70B\n(LLM)] as Llama
+    [Whisper\n(STT)] as Whisper
+  }
+}
+
+' Connections
+UI -down-> Router : HTTPS/JSON
+Voice --> Router : Audio Blob
+Editor --> Router : Code Submission
+
+Router -down-> SessionDO : Durable Object Binding
+
+SessionDO --> KV : Read Questions
+QSelect --> KV : Fetch Problems
+
+AIInt --> Llama : Generate Intros/Prompts
+AIEval --> Llama : Evaluate Code/Behavior
+AIGen --> Llama : Generate Hints/Responses
+
+Voice --> Whisper : Transcribe Audio
+
+note right of SessionDO
+  **Stateful Session Management**
+  - One DO instance per session
+  - Persistent state in DO storage
+  - Handles all session operations
+  - Auto-cleanup after 2 hours
+end note
+
+note right of KV
+  **Question Repository**
+  - Essentials (metadata)
+  - Full problems (by ID)
+  - ~100MB total data
+  - Global distribution
+end note
+
+note right of Llama
+  **Workers AI - Llama 3.3**
+  - Question selection
+  - Code evaluation  
+  - Behavioral assessment
+  - Final feedback generation
+  - fp8-fast for speed
+end note
+
+@enduml

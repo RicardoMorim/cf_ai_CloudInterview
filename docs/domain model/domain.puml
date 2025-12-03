@@ -1,312 +1,244 @@
-@startuml CloudInterview-DomainModel
-' Comprehensive Domain Model for CloudInterview (AI Interviewer Platform)
+@startuml
+!theme vibrant
+title CloudInterview - Domain Model
 
-' === ENUMS ===
+' Aggregates
+package "Interview Aggregate" {
+  entity InterviewSession <<Aggregate Root>> {
+    * sessionId: UUID
+    * userId: string
+    * mode: InterviewMode
+    * jobType: string
+    * difficulty: Difficulty
+    --
+    * status: InterviewStatus
+    * createdAt: DateTime
+    * startedAt: DateTime
+    * completedAt: DateTime
+    * duration: number (seconds)
+    --
+    currentQuestionIndex: number
+    jobTitle: string
+    jobDescription: string
+    seniority: ExperienceLevel
+  }
+  
+  entity InterviewQuestion <<Entity>> {
+    * questionId: string
+    * type: QuestionType
+    * category: string
+    * difficulty: Difficulty
+    --
+    * title: string
+    * text: string
+    estimatedTime: number
+    --
+    tags: string[]
+    hints: string[]
+    followUpQuestions: string[]
+    --
+    metadata: QuestionMetadata
+  }
+  
+  entity InterviewAnswer <<Entity>> {
+    * answerId: UUID
+    * questionId: string
+    * answerText: string
+    * submittedAt: DateTime
+    --
+    code: string
+    language: ProgrammingLanguage
+    responseTime: number
+    --
+    completenessScore: number
+    relevanceScore: number
+    communicationScore: number
+    --
+    evaluation: Evaluation
+  }
+  
+  entity AIResponse <<Entity>> {
+    * responseId: UUID
+    * sessionId: UUID
+    * questionId: string
+    --
+    * type: AIResponseType
+    * content: string
+    * generatedAt: DateTime
+    --
+    sentiment: Sentiment
+    confidence: number
+    responseTime: number
+    followUp: boolean
+  }
+  
+  InterviewSession "1" *-- "1..*" InterviewQuestion : contains
+  InterviewSession "1" *-- "0..*" InterviewAnswer : has
+  InterviewSession "1" *-- "0..*" AIResponse : generates
+}
+
+package "Question Bank" {
+  entity LeetCodeProblem <<Entity>> {
+    * id: number
+    * questionId: string
+    * title: string
+    * titleSlug: string
+    --
+    * difficulty: Difficulty
+    * description: string
+    --
+    examples: Example[]
+    constraints: string[]
+    --
+    metadata: ProblemMetadata
+  }
+  
+  entity ProblemMetadata <<Value Object>> {
+    category: string
+    topics: string[]
+    hints: string[]
+    likes: number
+    dislikes: number
+    similar_questions: SimilarQuestion[]
+  }
+  
+  LeetCodeProblem *-- ProblemMetadata
+}
+
+package "Feedback Aggregate" {
+  entity InterviewFeedback <<Aggregate Root>> {
+    * feedbackId: UUID
+    * sessionId: UUID
+    --
+    * overallScore: number (0-100)
+    * summary: string
+    * generatedAt: DateTime
+    --
+    strengths: string[]
+    improvementAreas: string[]
+    specificRecommendations: string[]
+    --
+    recommendation: HiringDecision
+  }
+  
+  entity Evaluation <<Value Object>> {
+    correctness: number
+    completeness: number
+    style: number
+    complexityAnalysis: string
+    feedback: string
+  }
+  
+  entity BehavioralAssessment <<Value Object>> {
+    starQuality: number
+    storytelling: number
+    impactDemonstration: number
+    selfAwareness: number
+    feedback: string
+  }
+  
+  InterviewFeedback "1" *-- "0..*" Evaluation
+  InterviewFeedback "1" *-- "0..*" BehavioralAssessment
+}
+
+' Enumerations
 enum InterviewMode {
-  Technical
-  Behavioral
-  Mixed
+  TECHNICAL
+  BEHAVIORAL
+  PRODUCT
+  SYSTEM_DESIGN
 }
 
 enum InterviewStatus {
-  Pending
-  InProgress
-  Completed
-  Cancelled
-  Timeout
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
 }
 
 enum QuestionType {
-  Coding
-  Theory
-  Behavioral
-  Scenario
-  SystemDesign
-  ProductDesign
+  CODING
+  BEHAVIORAL
+  THEORETICAL
+  SYSTEM_DESIGN
+  PRODUCT_DESIGN
+  SCENARIO
 }
 
 enum Difficulty {
-  Easy
-  Medium
-  Hard
-  Expert
-}
-
-enum ProgrammingLanguage {
-  Python
-  JavaScript
-  TypeScript
-  Java
-  Cpp
-  CSharp
-  Go
-  Rust
+  EASY
+  MEDIUM
+  HARD
 }
 
 enum ExperienceLevel {
-  Junior
-  Mid
-  Senior
-  Lead
-  Principal
+  JUNIOR
+  MID
+  SENIOR
+  STAFF
+  PRINCIPAL
 }
 
-enum ProficiencyLevel {
-  Beginner
-  Intermediate
-  Advanced
-  Expert
+enum AIResponseType {
+  ENCOURAGEMENT
+  HINT
+  CLARIFICATION
+  FEEDBACK
+  FOLLOW_UP
 }
 
-enum FeedbackStyle {
-  Detailed
-  Concise
-  Actionable
+enum Sentiment {
+  POSITIVE
+  NEUTRAL
+  NEGATIVE
 }
 
-' === VALUE OBJECTS ===
-class InterviewQuestion {
-  +questionId: String
-  +type: QuestionType
-  +category: String
-  +difficulty: Difficulty
-  +title: String
-  +text: String
-  +tags: List<String>
-  +estimatedTime: Integer
-  +followUpQuestions: List<String>
-  +hints: List<String>
-  +metadata: QuestionMetadata
+enum HiringDecision {
+  STRONG_HIRE
+  HIRE
+  LEANING_NO_HIRE
+  NO_HIRE
 }
 
-class InterviewAnswer {
-  +answerId: String
-  +sessionId: String
-  +questionId: String
-  +answerText: String
-  +submittedAt: Date
-  +responseTime: Integer
-  +codeSubmission: CodeSubmission
-  +approachExplanation: String
-  +starFormat: STARResponse
-  +completenessScore: Integer
-  +relevanceScore: Integer
-  +communicationScore: Integer
-}
+' Relationships with Enums
+InterviewSession --> InterviewMode
+InterviewSession --> InterviewStatus
+InterviewSession --> Difficulty
+InterviewSession --> ExperienceLevel
 
-class CodingChallenge {
-  +challengeId: String
-  +title: String
-  +description: String
-  +difficulty: Difficulty
-  +category: String
-  +topics: List<String>
-  +timeLimit: Integer
-  +testCases: List<TestCase>
-  +starterCode: Map<String, String>
-  +optimalSolution: Map<String, String>
-  +complexityAnalysis: ComplexityAnalysis
-  +relatedChallenges: List<String>
-  +difficultyWeight: Double
-}
+InterviewQuestion --> QuestionType
+InterviewQuestion --> Difficulty
 
-class InterviewFeedback {
-  +feedbackId: String
-  +sessionId: String
-  +overallScore: Integer
-  +summary: String
-  +technicalSkills: SkillAssessment
-  +communication: SkillAssessment
-  +problemSolving: SkillAssessment
-  +domainKnowledge: SkillAssessment
-  +behavioralCompetencies: BehavioralAssessment
-  +strengths: List<String>
-  +improvementAreas: List<String>
-  +specificRecommendations: List<String>
-  +percentileRank: Double
-  +benchmarkComparison: BenchmarkComparison
-  +generatedAt: Date
-}
+AIResponse --> AIResponseType
+AIResponse --> Sentiment
 
-class UserProfile {
-  +jobTitles: List<String>
-  +experienceLevel: ExperienceLevel
-  +primaryLanguages: List<String>
-  +industries: List<String>
-  +resumeSummary: String
-  +areasOfInterest: List<String>
-}
+InterviewFeedback --> HiringDecision
 
-class UserPreferences {
-  +defaultMode: InterviewMode
-  +defaultDifficulty: Difficulty
-  +languagePreferences: List<ProgrammingLanguage>
-  +feedbackStyle: FeedbackStyle
-  +voiceInputEnabled: Boolean
-  +darkMode: Boolean
-  +notifications: NotificationPreferences
-}
+' Cross-Aggregate References
+InterviewAnswer ..> InterviewQuestion : references
+AIResponse ..> InterviewQuestion : references
+InterviewFeedback ..> InterviewSession : evaluates
 
-class STARResponse {
-  +situation: String
-  +task: String
-  +action: String
-  +result: String
-  +reflection: String
-}
+note right of InterviewSession
+  **Aggregate Root**
+  - Manages interview lifecycle
+  - Coordinates questions and answers
+  - Enforces business rules
+  - Persisted in Durable Objects
+end note
 
-class CodeSubmission {
-  +submissionId: String
-  +challengeId: String
-  +language: ProgrammingLanguage
-  +code: String
-  +submittedAt: Date
-  +executionResult: ExecutionResult
-  +compilationErrors: List<String>
-  +styleIssues: List<CodeStyleIssue>
-  +complexityAnalysis: String
-}
+note right of LeetCodeProblem
+  **Repository Pattern**
+  - Stored in Cloudflare KV
+  - 3000+ problems available
+  - Fetched by QuestionSelector
+end note
 
-class SkillAssessment {
-  +skill: String
-  +score: Integer
-  +level: ProficiencyLevel
-  +confidence: Double
-  +evidence: List<String>
-  +growthTrajectory: GrowthTrajectory
-}
-
-class AIResponse {
-  +responseId: String
-  +sessionId: String
-  +questionId: String
-  +type: AIResponseType
-  +content: String
-  +generatedAt: Date
-  +sentiment: Sentiment
-  +followUp: Boolean
-  +responseTime: Integer
-  +confidence: Double
-}
-
-' === AGGREGATE ROOTS / ENTITIES ===
-class InterviewSession {
-  +sessionId: String
-  +userId: String
-  +mode: InterviewMode
-  +jobType: String
-  +difficulty: Difficulty
-  +status: InterviewStatus
-  +createdAt: Date
-  +startedAt: Date
-  +completedAt: Date
-  +duration: Integer
-  +currentQuestionIndex: Integer
-  +codingChallenge: CodingChallenge
-  +scenarioContext: ScenarioContext
-  --
-  +startInterview()
-  +nextQuestion(): InterviewQuestion
-  +submitAnswer(questionId: String, answerText: String)
-  +generateFeedback(): InterviewFeedback
-  +completeSession()
-  +getTranscript(): String
-}
-
-class User {
-  +userId: String
-  +email: String
-  +name: String
-  +profile: UserProfile
-  +createdAt: Date
-  +lastActive: Date
-  +preferences: UserPreferences
-  --
-  +getSessionHistory(): List<InterviewSession>
-  +deleteSession(sessionId: String)
-  +updateProfile(profile: UserProfile)
-  +getProgressReport(): ProgressReport
-}
-
-' === DOMAIN SERVICES ===
-class InterviewOrchestrationService {
-  +startSession(user: User, mode: InterviewMode, jobType: String): InterviewSession
-  +presentNextQuestion(session: InterviewSession): InterviewQuestion
-  +evaluateAnswer(session: InterviewSession, answer: InterviewAnswer): AIResponse
-  +generateFeedback(session: InterviewSession): InterviewFeedback
-  +completeSession(session: InterviewSession)
-}
-
-class QuestionSelectionService {
-  +selectQuestions(user: User, mode: InterviewMode, difficulty: Difficulty, count: Integer): List<InterviewQuestion>
-  +adaptDifficulty(session: InterviewSession, performance: PerformanceMetrics): Difficulty
-  +getFollowUpQuestions(question: InterviewQuestion, answer: InterviewAnswer): List<InterviewQuestion>
-}
-
-class FeedbackGenerationService {
-  +analyzeTechnicalPerformance(session: InterviewSession): TechnicalAssessment
-  +analyzeBehavioralResponse(answer: InterviewAnswer): BehavioralAnalysis
-  +generateOverallFeedback(session: InterviewSession): InterviewFeedback
-  +createRecommendations(session: InterviewSession): LearningRecommendations
-}
-
-' === REPOSITORIES ===
-class InterviewSessionRepository {
-  +save(session: InterviewSession)
-  +findById(sessionId: String): InterviewSession
-  +findByUser(userId: String, limit: Integer): List<InterviewSession>
-  +delete(sessionId: String)
-}
-
-class QuestionRepository {
-  +findById(questionId: String): InterviewQuestion
-  +findByCriteria(criteria: QuestionSearchCriteria): List<InterviewQuestion>
-  +save(question: InterviewQuestion)
-  +update(question: InterviewQuestion)
-  +delete(questionId: String)
-}
-
-class UserRepository {
-  +save(user: User)
-  +findById(userId: String): User
-  +findByEmail(email: String): User
-  +delete(userId: String)
-}
-
-' === RELATIONSHIPS ===
-' Core relationships
-InterviewSession "1" o-- "*" InterviewQuestion : contains >
-InterviewSession "1" o-- "*" InterviewAnswer : contains >
-InterviewSession "1" o-- "*" AIResponse : contains >
-InterviewSession "1" o-- "1" InterviewFeedback : produces >
-InterviewSession "1" o-- "*" CodeSubmission : includes >
-InterviewSession "1" o-- "1" CodingChallenge : includes >
-User "1" o-- "*" InterviewSession : owns >
-User "1" o-- "1" UserProfile : has >
-User "1" o-- "1" UserPreferences : has >
-
-' Service relationships
-InterviewOrchestrationService --> InterviewSession
-InterviewOrchestrationService --> InterviewQuestion
-InterviewOrchestrationService --> InterviewFeedback
-InterviewOrchestrationService --> InterviewSessionRepository
-InterviewOrchestrationService --> QuestionSelectionService
-InterviewOrchestrationService --> FeedbackGenerationService
-
-QuestionSelectionService --> QuestionRepository
-FeedbackGenerationService --> InterviewSessionRepository
-UserRepository --> User
-
-' Enum relationships
-InterviewSession ..> InterviewMode
-InterviewSession ..> InterviewStatus
-InterviewQuestion ..> QuestionType
-InterviewQuestion ..> Difficulty
-CodingChallenge ..> Difficulty
-InterviewAnswer ..> ProgrammingLanguage
-UserPreferences ..> InterviewMode
-UserPreferences ..> Difficulty
-User ..> ExperienceLevel
-SkillAssessment ..> ProficiencyLevel
+note right of InterviewFeedback
+  **Generated by AI**
+  - Created at session end
+  - Uses Llama 3.3 for analysis
+  - Provides actionable insights
+end note
 
 @enduml

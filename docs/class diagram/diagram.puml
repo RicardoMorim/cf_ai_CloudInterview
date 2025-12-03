@@ -1,113 +1,223 @@
-@startuml CloudInterview-Architecture
-package "Domain Layer" {
-    class InterviewSession
-    class InterviewQuestion
-    class InterviewAnswer
-    class InterviewFeedback
-    class CodingChallenge
-    class User
-    class UserProfile
-    class UserPreferences
-    class STARResponse
-    class CodeSubmission
-    class SkillAssessment
-    class AIResponse
+@startuml
+!theme vibrant
+title CloudInterview - Class Diagram (Updated Architecture)
+
+package "Frontend Layer" {
+  class InterviewPage {
+    -sessionId: string
+    -currentQuestion: InterviewQuestion
+    -answers: InterviewAnswer[]
+    +startInterview()
+    +submitAnswer()
+    +nextQuestion()
+    +endInterview()
+  }
+  
+  class CodeEditor {
+    -code: string
+    -language: ProgrammingLanguage
+    -theme: string
+    +executeCode()
+    +formatCode()
+    +resetCode()
+  }
+  
+  class VoiceInterface {
+    -isRecording: boolean
+    -audioBlob: Blob
+    +startRecording()
+    +stopRecording()
+    +transcribeAudio()
+  }
 }
 
-package "Application Layer" {
-    class InterviewManagementService
-    class UserExperienceService
-    class QuestionSelectionService
-    class FeedbackGenerationService
-    class InterviewOrchestrationService
+package "Backend - Cloudflare Worker" {
+  class HonoRouter {
+    +POST /api/sessions
+    +GET /api/sessions/:id/question/next
+    +POST /api/sessions/:id/answer
+    +POST /api/sessions/:id/chat
+    +POST /api/sessions/:id/end
+  }
+  
+  package "Middleware" {
+    class CorsMiddleware {
+      +handle(request, next)
+    }
+    
+    class ErrorHandler {
+      +handle(error, context)
+    }
+    
+    class AppError {
+      +statusCode: number
+      +code: string
+      +message: string
+      +details?: string
+    }
+  }
 }
 
-package "Infrastructure Layer" {
-    class InterviewSessionRepository
-    class QuestionRepository
-    class UserRepository
-    class KVService
-    class DurableObjectService
-    class AIIntegrationService
-    class SpeechRecognitionService
+package "Services Layer" {
+  package "AI Services" {
+    class AIInterviewer {
+      -AI: WorkersAI
+      +generateOpeningIntroduction()
+      +generateClosingRemarks()
+      +generateQuestionPrompt()
+    }
+    
+    class AIEvaluator {
+      -AI: WorkersAI
+      +evaluateCodeSubmission()
+      +conductBehavioralEvaluation()
+      +analyzeSentiment()
+    }
+    
+    class AIGenerator {
+      -AI: WorkersAI
+      +generateResponse()
+      +generateHint()
+      +generateScenarioQuestion()
+    }
+  }
+  
+  package "Question Services" {
+    class QuestionSelector {
+      -env: Env
+      +selectTechnicalQuestions()
+      +selectBehavioralQuestions()
+      -selectQuestionsWithAI()
+      -parseAIQuestionResponse()
+      -fallbackRandomSelection()
+    }
+  }
+  
+  package "Session Services" {
+    class SessionStateManager {
+      +updateStatus()
+      +addAnswer()
+      +getCurrentQuestion()
+      +addAIResponse()
+      +updateDuration()
+    }
+    
+    class SessionActions {
+      +submitAnswer()
+      +nextQuestion()
+      +generateFinalFeedback()
+      +completeSession()
+      +processChatMessage()
+      +buildTranscript()
+    }
+  }
 }
 
-package "Presentation Layer" {
-    class InterviewController
-    class UserController
-    class QuestionBankController
-    class FeedbackController
-    class WebSocketController
+package "Durable Objects" {
+  class InterviewSessionDO {
+    -state: DurableObjectState
+    -env: Env
+    -session: InterviewSession
+    +startSession()
+    +getCurrentQuestion()
+    +submitAnswer()
+    +nextQuestion()
+    +completeSession()
+    +processChatMessage()
+    +getTranscript()
+    -loadSession()
+    -saveSession()
+    -setupSessionCleanup()
+  }
 }
 
-package "AI/Agents Layer" {
-    class AIInterviewerAgent
-    class LLMClient
-    class PromptManager
-    class ResponseEvaluator
+package "Data Models" {
+  class InterviewSession {
+    +sessionId: string
+    +userId: string
+    +mode: InterviewMode
+    +status: InterviewStatus
+    +questions: InterviewQuestion[]
+    +answers: InterviewAnswer[]
+    +aiResponses: AIResponse[]
+    +feedback?: InterviewFeedback
+    +currentQuestionIndex: number
+  }
+  
+  class InterviewQuestion {
+    +questionId: string
+    +type: QuestionType
+    +title: string
+    +text: string
+    +difficulty: Difficulty
+    +hints: string[]
+    +tags: string[]
+  }
+  
+  class InterviewAnswer {
+    +questionId: string
+    +answerText: string
+    +code?: string
+    +language?: ProgrammingLanguage
+    +submittedAt: string
+    +evaluation?: Evaluation
+  }
+  
+  class AIResponse {
+    +responseId: string
+    +type: AIResponseType
+    +content: string
+    +sentiment: Sentiment
+    +confidence: number
+    +followUp: boolean
+  }
 }
 
-package "External Services" {
-    class WorkersAI
-    class CloudflareKV
-    class CloudflareDurableObjects
-    class WebSpeechAPI
-    class CodeExecutionService
+package "Cloudflare Infrastructure" {
+  class WorkersAI {
+    +run(model, params)
+  }
+  
+  class KVNamespace {
+    +get(key, options)
+    +put(key, value)
+  }
+  
+  class DurableObjectState {
+    +storage: DurableObjectStorage
+    +id: DurableObjectId
+  }
 }
 
-' Domain relationships
-InterviewSession "1" o-- "*" InterviewQuestion
-InterviewSession "1" o-- "*" InterviewAnswer
-InterviewSession "1" o-- "*" AIResponse
-InterviewSession "1" o-- "1" InterviewFeedback
-InterviewSession "1" o-- "*" CodeSubmission
-InterviewSession "1" o-- "1" CodingChallenge
-User "1" o-- "*" InterviewSession
-User "1" o-- "1" UserProfile
-User "1" o-- "1" UserPreferences
+' Relationships
+InterviewPage --> HonoRouter : HTTP Requests
+InterviewPage *-- CodeEditor
+InterviewPage *-- VoiceInterface
 
-' Application service relationships
-InterviewManagementService --> InterviewSession
-InterviewManagementService --> InterviewOrchestrationService
-InterviewManagementService --> InterviewSessionRepository
+HonoRouter --> CorsMiddleware
+HonoRouter --> ErrorHandler
+HonoRouter --> InterviewSessionDO
 
-UserExperienceService --> User
-UserExperienceService --> UserRepository
-UserExperienceService --> InterviewManagementService
+InterviewSessionDO --> QuestionSelector : uses
+InterviewSessionDO --> SessionActions : delegates
+InterviewSessionDO --> SessionStateManager : uses
+InterviewSessionDO *-- InterviewSession
 
-QuestionSelectionService --> QuestionRepository
-FeedbackGenerationService --> InterviewSessionRepository
-InterviewOrchestrationService --> QuestionSelectionService
-InterviewOrchestrationService --> FeedbackGenerationService
+QuestionSelector --> WorkersAI : uses
+QuestionSelector --> KVNamespace : reads
 
-' Infrastructure relationships
-InterviewSessionRepository --> InterviewSession
-QuestionRepository --> InterviewQuestion
-UserRepository --> User
-KVService --> QuestionBank
-DurableObjectService --> InterviewSession
-AIIntegrationService --> AIInterviewerAgent
-SpeechRecognitionService --> InterviewController
+AIEvaluator --> WorkersAI : uses
+AIInterviewer --> WorkersAI : uses
+AIGenerator --> WorkersAI : uses
 
-' API Controller relationships
-InterviewController --> InterviewManagementService
-UserController --> UserExperienceService
-QuestionBankController --> QuestionSelectionService
-FeedbackController --> FeedbackGenerationService
-WebSocketController --> InterviewOrchestrationService
+SessionActions --> AIInterviewer : uses
+SessionActions --> AIEvaluator : uses
+SessionActions --> AIGenerator : uses
 
-' AI Agent relationships
-AIInterviewerAgent --> LLMClient
-AIInterviewerAgent --> PromptManager
-AIInterviewerAgent --> ResponseEvaluator
-LLMClient --> WorkersAI
-PromptManager --> InterviewQuestion
-ResponseEvaluator --> InterviewAnswer
+InterviewSession *-- InterviewQuestion
+InterviewSession *-- InterviewAnswer
+InterviewSession *-- AIResponse
 
-' External service relationships
-KVService --> CloudflareKV
-DurableObjectService --> CloudflareDurableObjects
-SpeechRecognitionService --> WebSpeechAPI
-CodeExecutionService --> InterviewQuestion
+SessionStateManager ..> InterviewSession : modifies
 
 @enduml
