@@ -11,8 +11,9 @@ interface QuestionDisplayProps {
 
 /**
  * Question display component showing the current interview question
+ * Memoized to prevent unnecessary re-renders
  */
-export const QuestionDisplay: React.FC<QuestionDisplayProps> = ({
+export const QuestionDisplay = React.memo<QuestionDisplayProps>(({
     question,
     questionNumber,
     hintsRevealed,
@@ -74,4 +75,4 @@ export const QuestionDisplay: React.FC<QuestionDisplayProps> = ({
             </div>
         </div>
     );
-};
+});

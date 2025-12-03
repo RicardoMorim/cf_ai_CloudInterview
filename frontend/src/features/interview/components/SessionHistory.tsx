@@ -12,8 +12,9 @@ interface SessionHistoryProps {
 
 /**
  * Session history component showing interview timeline
+ * Memoized to prevent unnecessary re-renders
  */
-export const SessionHistory: React.FC<SessionHistoryProps> = ({ history }) => {
+export const SessionHistory = React.memo<SessionHistoryProps>(({ history }) => {
     return (
         <div className="session-history">
             <h3>Interview Flow</h3>
@@ -48,4 +49,4 @@ export const SessionHistory: React.FC<SessionHistoryProps> = ({ history }) => {
             </div>
         </div>
     );
-};
+});

@@ -10,8 +10,9 @@ interface InterviewHeaderProps {
 
 /**
  * Interview header component displaying session info and timer
+ * Memoized to prevent unnecessary re-renders
  */
-export const InterviewHeader: React.FC<InterviewHeaderProps> = ({
+export const InterviewHeader = React.memo<InterviewHeaderProps>(({
     session,
     timeRemaining,
     formatTime
@@ -41,4 +42,4 @@ export const InterviewHeader: React.FC<InterviewHeaderProps> = ({
             </div>
         </div>
     );
-};
+});

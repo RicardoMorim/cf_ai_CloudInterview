@@ -14,8 +14,9 @@ interface CodeEditorProps {
 
 /**
  * Code editor component wrapping Monaco editor with language selection
+ * Memoized to prevent unnecessary re-renders
  */
-export const CodeEditor: React.FC<CodeEditorProps> = ({
+export const CodeEditor = React.memo<CodeEditorProps>(({
     code,
     language,
     isDark,
@@ -78,4 +79,4 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
             )}
         </div>
     );
-};
+});

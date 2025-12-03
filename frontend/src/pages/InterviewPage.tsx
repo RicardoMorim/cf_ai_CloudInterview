@@ -104,19 +104,19 @@ const InterviewPage: React.FC = () => {
     }, [sessionHistory, speak]);
 
 
-    const handleVoiceInput = () => {
+    const handleVoiceInput = useCallback(() => {
         if (isListening) {
             stopListening();
         } else {
             startListening();
         }
-    };
+    }, [isListening, stopListening, startListening]);
 
-    const formatTime = (seconds: number) => {
+    const formatTime = useCallback((seconds: number) => {
         const mins = Math.floor(seconds / 60);
         const secs = seconds % 60;
         return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-    };
+    }, []);
 
     const handleEndInterview = async () => {
         if (!currentSession) return;
