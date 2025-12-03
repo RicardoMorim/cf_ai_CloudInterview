@@ -16,6 +16,7 @@ import { useAnswerSubmission } from '../features/interview/hooks/useAnswerSubmis
 import { InterviewHeader } from '../features/interview/components/InterviewHeader';
 import { QuestionDisplay } from '../features/interview/components/QuestionDisplay';
 import { CodeEditor } from '../features/code-editor/components/CodeEditor';
+import { SessionHistory } from '../features/interview/components/SessionHistory';
 
 const InterviewPage: React.FC = () => {
     const navigate = useNavigate();
@@ -162,39 +163,7 @@ const InterviewPage: React.FC = () => {
                         revealNextHint={revealNextHint}
                     />
 
-                    {/* Session History */}
-                    <div className="session-history">
-                        <h3>Interview Flow</h3>
-                        <div className="history-timeline">
-                            {sessionHistory.map((item, index) => (
-                                <div key={index} className={`timeline-item ${item.type}`}>
-                                    <div className="timeline-marker"></div>
-                                    <div className="timeline-content">
-                                        {item.type === 'question' && (
-                                            <>
-                                                <div className="timeline-label">Question</div>
-                                                <div className="timeline-text">{item.content.title || item.content.text}</div>
-                                            </>
-                                        )}
-                                        {item.type === 'answer' && (
-                                            <>
-                                                <div className="timeline-label">Your Answer</div>
-                                                <div className="timeline-text">{item.content.answerText}</div>
-                                            </>
-                                        )}
-                                        {item.type === 'ai_response' && (
-                                            <>
-                                                <div className="timeline-label">Feedback</div>
-                                                <div className="timeline-text">
-                                                    <ReactMarkdown>{item.content.content}</ReactMarkdown>
-                                                </div>
-                                            </>
-                                        )}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
+                    <SessionHistory history={sessionHistory} />
 
                     {/* Answer Form */}
                     <div className="answer-section">
