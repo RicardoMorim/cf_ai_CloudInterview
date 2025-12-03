@@ -1,7 +1,6 @@
 import { OpenAPIRoute } from "chanfana";
 import { z } from "zod";
 import { AppContext } from "../types";
-import { SessionManager } from "../services/session-management";
 import { VoiceAgent } from "../services/voice-agent";
 
 export class VoiceChat extends OpenAPIRoute {
@@ -47,9 +46,9 @@ export class VoiceChat extends OpenAPIRoute {
         const { SESSION_NAMESPACE, AI } = c.env as any;
 
         try {
-            // 1. Get Session Context
-            const sessionManager = new SessionManager(SESSION_NAMESPACE);
-            const sessionStub = sessionManager.getSessionStub(sessionId);
+            // 1. Get Session Context - Get Durable Object stub directly
+            const id = SESSION_NAMESPACE.idFromName(sessionId);
+            const sessionStub = SESSION_NAMESPACE.get(id);
 
             // Fetch current state/question
             const currentQuestionRes = await sessionStub.fetch("http://internal/question/current");

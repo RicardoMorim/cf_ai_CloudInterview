@@ -20,7 +20,7 @@ export const InterviewHeader = React.memo<InterviewHeaderProps>(({
     return (
         <div className="interview-header">
             <div className="interview-info">
-                <h1>AI Interview</h1>
+                <h1>CloudInterview</h1>
                 <div className="interview-meta">
                     <span className="interview-mode">
                         {session?.mode === 'technical'

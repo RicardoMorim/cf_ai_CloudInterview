@@ -1,5 +1,3 @@
-// Domain Service Interfaces for CloudInterview
-
 import {
   InterviewSession,
   InterviewQuestion,

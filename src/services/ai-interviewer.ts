@@ -1,5 +1,3 @@
-// AI Interviewer Agent for CloudInterview using Workers AI
-
 import {
   InterviewQuestion,
   InterviewAnswer,

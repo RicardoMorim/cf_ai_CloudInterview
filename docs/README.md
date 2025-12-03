@@ -2,17 +2,6 @@
 
 Welcome to CloudInterview documentation! This page provides quick links to all documentation resources.
 
----
-
-## 🚀 Getting Started
-
-**New to CloudInterview?** Start here:
-
-- **[Installation Guide](getting-started/installation.md)** - Set up your development environment
-- **[Quick Start](getting-started/installation.md#running-locally-quickest-path)** - Run the app in 5 minutes
-
----
-
 ## 📚 Core Documentation
 
 ### Architecture
@@ -48,7 +37,7 @@ Welcome to CloudInterview documentation! This page provides quick links to all d
 1. [Getting Started](getting-started/installation.md) - Run the app locally
 2. [Architecture Overview](architecture/overview.md) - Understand Cloudflare stack usage
 3. [API Documentation](api/endpoints.md) - Explore endpoints
-4. [AI Prompts](../PROMPTS.md) - Review AI integration ( 29 prompts documented)
+4. [AI Prompts](../PROMPTS.md) - Review AI usage
 
 **Cloudflare Technologies Used:**
 - ✅ Workers AI (Llama 3.3 70B, Whisper)
@@ -78,5 +67,5 @@ This is a Cloudflare internship assignment project. See [LICENSE](../LICENSE) fo
 ## 🔗 External Links
 
 - **GitHub Repository:** [RicardoMorim/cf_ai_CloudInterview](https://github.com/RicardoMorim/cf_ai_CloudInterview)
-- **Live Demo:** (Coming soon)
+- **Live Demo:** [CloudInterview](https://cf-ai-cloud-interview.vercel.app/)
 - **Cloudflare Workers:** [Documentation](https://developers.cloudflare.com/workers/)

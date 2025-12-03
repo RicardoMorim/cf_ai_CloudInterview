@@ -34,7 +34,7 @@ CloudInterview is a modern, AI-driven platform designed to help developers pract
 
 1.  **Clone the repository:**
     ```bash
-    git clone https://github.com/yourusername/cloudinterview.git
+    git clone https://github.com/RicardoMorim/cloudinterview.git
     cd cloudinterview
     ```
 

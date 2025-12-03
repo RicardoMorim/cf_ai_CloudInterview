@@ -1,7 +1,6 @@
 import { OpenAPIRoute } from "chanfana";
 import { z } from "zod";
 import { AppContext } from "../types";
-import { SessionManager } from "../services/session-management";
 
 export class SessionCreate extends OpenAPIRoute {
 	schema = {
@@ -71,27 +70,36 @@ export class SessionCreate extends OpenAPIRoute {
 		const data = await this.getValidatedData<typeof this.schema>();
 		const { mode, jobType, difficulty, duration, language, includeCoding, topics, jobDescription, seniority } = data.body;
 
-		// Get KV binding
+		// Get Durable Object namespace
 		const { SESSION_NAMESPACE } = c.env as any;
 
 		try {
 			// TODO: Get user from auth (placeholder for now)
 			const userId = "user_123";
 
-			console.log("SessionCreate: Initializing SessionManager");
-			// Create session using SessionManager
-			const sessionManager = new SessionManager(SESSION_NAMESPACE);
+			console.log("SessionCreate: Creating session via Durable Object");
 
-			console.log("SessionCreate: Calling createSession");
-			const { sessionId, session } = await sessionManager.createSession(
-				userId,
-				mode as any,
-				jobType,
-				difficulty as any,
-				duration,
-				jobDescription,
-				seniority as any
-			);
+			// Create unique session ID and get Durable Object stub
+			const sessionId = crypto.randomUUID();
+			const id = SESSION_NAMESPACE.idFromName(sessionId);
+			const stub = SESSION_NAMESPACE.get(id);
+
+			// Call startSession on the Durable Object
+			const sessionResponse = await stub.fetch("http://internal/start", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					userId,
+					mode,
+					jobType,
+					difficulty,
+					duration,
+					jobDescription,
+					seniority
+				})
+			});
+
+			const { session } = await sessionResponse.json() as any;
 			console.log("SessionCreate: Session created with ID:", sessionId);
 
 			// We removed the blocking AI generation here.

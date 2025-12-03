@@ -1,5 +1,3 @@
-// Feedback Generation Service for CloudInterview
-
 import {
   InterviewSession,
   InterviewAnswer,

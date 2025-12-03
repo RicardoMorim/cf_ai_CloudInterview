@@ -1,5 +1,3 @@
-// Question Bank Service for CloudInterview
-
 import {
   InterviewQuestion,
   CodingChallenge,

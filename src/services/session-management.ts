@@ -1,7 +1,4 @@
-﻿// Interview Session Management - Durable Object
-// Simplified to focus on DO lifecycle, delegating business logic to services
-
-import { InterviewSession, InterviewQuestion, InterviewAnswer, AIResponse, InterviewMode, InterviewStatus, Difficulty, QuestionType } from "../types";
+﻿import { InterviewSession, InterviewQuestion, InterviewAnswer, AIResponse, InterviewMode, InterviewStatus, Difficulty, QuestionType } from "../types";
 import { QuestionSelector } from "./questions/questionSelector";
 import { SessionActions } from "./session/sessionActions";
 
