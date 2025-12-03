@@ -255,4 +255,100 @@ export class InterviewSessionDO {
     await this.saveSession();
     return this.session;
   }
+
+  // ==================
+  // HTTP HANDLER
+  // ==================
+
+  async fetch(request: Request): Promise<Response> {
+    const url = new URL(request.url);
+    const path = url.pathname;
+
+    try {
+      // Handle different endpoints
+      if (path === "/start" && request.method === "POST") {
+        const body = await request.json() as any;
+        const session = await this.startSession(
+          body.userId,
+          body.mode,
+          body.jobType,
+          body.difficulty,
+          body.duration,
+          body.jobTitle,
+          body.jobDescription,
+          body.seniority
+        );
+        return new Response(JSON.stringify({ success: true, session }), {
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+
+      if (path === "/question/current" && request.method === "GET") {
+        const question = await this.getCurrentQuestion();
+        return new Response(JSON.stringify({ success: true, question }), {
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+
+      if (path === "/answer" && request.method === "POST") {
+        const body = await request.json() as any;
+        const result = await this.submitAnswer(body);
+        return new Response(JSON.stringify({ success: true, ...result }), {
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+
+      if (path === "/question/next" && request.method === "GET") {
+        const result = await this.nextQuestion();
+        return new Response(JSON.stringify({ success: true, ...result }), {
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+
+      if (path === "/end" && request.method === "POST") {
+        const session = await this.completeSession();
+        return new Response(JSON.stringify({ success: true, session }), {
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+
+      if (path === "/chat" && request.method === "POST") {
+        const body = await request.json() as any;
+        const result = await this.processChatMessage(body.message);
+        return new Response(JSON.stringify({ success: true, ...result }), {
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+
+      if (path === "/state" && request.method === "GET") {
+        const session = await this.getSession();
+        return new Response(JSON.stringify({ success: true, session }), {
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+
+      if (path === "/transcript" && request.method === "GET") {
+        const result = await this.getTranscript();
+        return new Response(JSON.stringify({ success: true, ...result }), {
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+
+      // Unknown endpoint
+      return new Response(JSON.stringify({ success: false, error: "Not found" }), {
+        status: 404,
+        headers: { "Content-Type": "application/json" }
+      });
+
+    } catch (error) {
+      console.error("DO fetch error:", error);
+      return new Response(JSON.stringify({
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error"
+      }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+  }
 }
