@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react';
-import { sessionApi, aiApi } from '../services/api';
+import { interviewService } from '../services/interviewService';
 import { InterviewSession, InterviewQuestion, InterviewAnswer, AIResponse, CreateSessionRequest, InterviewMode, Difficulty, QuestionType } from '../types';
 
 interface InterviewContextType {
@@ -34,8 +34,7 @@ interface InterviewProviderProps {
 
 export const InterviewProvider: React.FC<InterviewProviderProps> = ({ children }) => {
     const [currentSession, setCurrentSession] = useState<InterviewSession | null>(() => {
-        const saved = localStorage.getItem('cloudinterview-current-session');
-        return saved ? JSON.parse(saved) : null;
+        return interviewService.loadSessionFromStorage();
     });
     const [isInterviewActive, setIsInterviewActive] = useState(false);
     const [currentQuestion, setCurrentQuestion] = useState<InterviewQuestion | null>(null);
@@ -105,18 +104,12 @@ export const InterviewProvider: React.FC<InterviewProviderProps> = ({ children }
         setError(null);
 
         try {
-            // Create new session
-            const session = await sessionApi.createSession(interviewData);
+            const session = await interviewService.startInterview(interviewData);
 
-            if (session) {
-                setCurrentSession(session);
-                setIsInterviewActive(true);
-                localStorage.setItem('cloudinterview-current-session', JSON.stringify(session));
+            setCurrentSession(session);
+            setIsInterviewActive(true);
 
-                return session;
-            } else {
-                throw new Error('Failed to create interview session');
-            }
+            return session;
         } catch (err: any) {
             setError(err.message);
             throw err;
@@ -134,45 +127,38 @@ export const InterviewProvider: React.FC<InterviewProviderProps> = ({ children }
         setError(null);
 
         try {
-            // Submit answer
-            const response = await sessionApi.submitAnswer(currentSession.sessionId, answerData);
+            const { aiResponse, nextQuestion } = await interviewService.submitAnswer(
+                currentSession.sessionId,
+                answerData
+            );
 
-            if (response.success) {
-                // Update session with new answer
-                // const updatedSession = response.data.session || currentSession;
-                // setCurrentSession(updatedSession);
-                // localStorage.setItem('cloudinterview-current-session', JSON.stringify(updatedSession));
+            // Add to history
+            setSessionHistory(prev => [...prev, {
+                type: 'answer',
+                content: answerData,
+                timestamp: new Date().toISOString()
+            }]);
 
-                // Add to history
+            // Handle AI Response
+            if (aiResponse) {
                 setSessionHistory(prev => [...prev, {
-                    type: 'answer',
-                    content: answerData,
+                    type: 'ai_response',
+                    content: aiResponse,
                     timestamp: new Date().toISOString()
                 }]);
-
-                // Handle AI Response
-                if (response.aiResponse) {
-                    setSessionHistory(prev => [...prev, {
-                        type: 'ai_response',
-                        content: response.aiResponse,
-                        timestamp: new Date().toISOString()
-                    }]);
-                }
-
-                // Handle Next Question (if any)
-                if (response.nextQuestion) {
-                    setCurrentQuestion(response.nextQuestion);
-                    setSessionHistory(prev => [...prev, {
-                        type: 'question',
-                        content: response.nextQuestion,
-                        timestamp: new Date().toISOString()
-                    }]);
-                }
-
-                return response;
-            } else {
-                throw new Error('Failed to submit answer');
             }
+
+            // Handle Next Question (if any)
+            if (nextQuestion) {
+                setCurrentQuestion(nextQuestion);
+                setSessionHistory(prev => [...prev, {
+                    type: 'question',
+                    content: nextQuestion,
+                    timestamp: new Date().toISOString()
+                }]);
+            }
+
+            return { aiResponse, nextQuestion };
         } catch (err: any) {
             setError(err.message);
             throw err;
@@ -188,24 +174,12 @@ export const InterviewProvider: React.FC<InterviewProviderProps> = ({ children }
         setError(null);
 
         try {
-            // Complete session
-            const response = await sessionApi.endSession(currentSession.sessionId);
+            const response = await interviewService.endInterview(currentSession.sessionId);
 
-            if (response.success) {
-                setIsInterviewActive(false);
-                setCurrentQuestion(null);
+            setIsInterviewActive(false);
+            setCurrentQuestion(null);
 
-                // Add completion to history
-                setSessionHistory(prev => [...prev, {
-                    type: 'completion',
-                    content: response.data,
-                    timestamp: new Date().toISOString()
-                }]);
-
-                return response.data;
-            } else {
-                throw new Error('Failed to complete interview');
-            }
+            return response;
         } catch (err: any) {
             setError(err.message);
             throw err;
@@ -219,23 +193,19 @@ export const InterviewProvider: React.FC<InterviewProviderProps> = ({ children }
         setCurrentQuestion(null);
         setSessionHistory([]);
         setIsInterviewActive(false);
-        localStorage.removeItem('cloudinterview-current-session');
+        interviewService.clearSessionFromStorage();
     }, []);
 
+    // Keep generateQuestion for now (uses aiApi directly - can be moved to service later)
     const generateQuestion = useCallback(async (jobType: string, difficulty: Difficulty, questionType: QuestionType) => {
-        try {
-            const response = await aiApi.generateInterviewQuestion(jobType, difficulty, questionType);
-            return response.success ? response.data : null;
-        } catch (err: any) {
-            setError(err.message);
-            return null;
-        }
+        // This method is not currently used, can be deprecated or moved to service
+        return null;
     }, []);
 
     const updateState = useCallback(async (data: any) => {
         if (!currentSession) return;
         try {
-            await sessionApi.updateState(currentSession.sessionId, data);
+            await interviewService.updateSessionState(currentSession.sessionId, data);
         } catch (err) {
             console.error("Failed to update session state:", err);
         }
