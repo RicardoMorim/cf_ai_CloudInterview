@@ -109,6 +109,22 @@ export class VoiceChat extends OpenAPIRoute {
                         aiResponse: greetingText,
                         audio: audioBuffer
                     };
+                } else if (body.message) {
+                    // Handle text-based chat message (post-interview or during interview)
+                    const chatResponse = await sessionStub.fetch("http://internal/chat", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ message: body.message, code: body.code })
+                    });
+
+                    const chatData = await chatResponse.json() as any;
+
+                    // Return JSON response for text chat
+                    return c.json({
+                        success: true,
+                        response: chatData.response,
+                        session: chatData.session
+                    });
                 } else {
                     return c.json({ success: false, error: "Invalid action" }, 400);
                 }

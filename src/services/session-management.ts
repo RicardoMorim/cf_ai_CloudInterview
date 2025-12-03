@@ -305,9 +305,9 @@ Return ONLY the JSON object with this structure:
       difficulty,
       jobDescription,
       seniority: seniority as any,
-      status: InterviewStatus.PENDING,
+      status: InterviewStatus.IN_PROGRESS, // Start immediately, not PENDING
       createdAt: now,
-      startedAt: null,
+      startedAt: now, // Set startedAt to now since we're starting immediately
       completedAt: null,
       duration: 0,
       currentQuestionIndex: 0,
@@ -767,6 +767,8 @@ Return ONLY the JSON object with this structure:
             const evaluationPrompt = `
               You are an expert technical interviewer. Evaluate the candidate's answer to the following question.
               
+              CRITICAL: RESPOND IN ENGLISH ONLY. DO NOT USE PORTUGUESE OR ANY OTHER LANGUAGE.
+              
               Question: ${currentQ.text}
               Type: ${currentQ.type}
               Difficulty: ${currentQ.difficulty}
@@ -775,14 +777,27 @@ Return ONLY the JSON object with this structure:
               ${fullAnswer.codeSubmission ? `Candidate Code (${fullAnswer.codeSubmission.language}):\n${fullAnswer.codeSubmission.code}` : ''}
               
               Provide a JSON response with:
-              - feedback: Constructive feedback to the candidate (speak directly to them).
+              - feedback: Brief feedback (2-3 sentences max, in English). Say "Good work! Moving to the next question." if answer is acceptable.
               - score: 0-100 score.
               - sentiment: "positive", "neutral", or "negative".
-              - followUp: true/false if a follow-up is needed.
+              - followUp: false (we're moving to next question, not doing follow-ups).
+              
+              IMPORTANT: Keep feedback VERY brief. DO NOT provide detailed explanations. RESPOND IN ENGLISH ONLY.
             `;
 
             const aiGenResponse = await this.env.AI.run("@cf/meta/llama-3.3-70b-instruct-fp8-fast", {
-              messages: [{ role: "user", content: evaluationPrompt }]
+              messages: [
+                {
+                  role: "system",
+                  content: "You are a technical interviewer. You MUST respond ONLY in English. Never use Portuguese or any other language. All responses must be in English."
+                },
+                {
+                  role: "user",
+                  content: evaluationPrompt
+                }
+              ],
+              temperature: 0.3, // Lower temperature for more deterministic English responses
+              max_tokens: 300
             });
 
             let responseText = "";
@@ -834,13 +849,25 @@ Return ONLY the JSON object with this structure:
             await this.addAIResponse(aiResponseData);
           }
 
-          // 3. Determine next question (if any)
-          // For now, we just return the current state, client calls /next
+          // 3. Move to next question or complete interview
+          this.session.currentQuestionIndex++;
+          await this.saveSession();
+
+          let nextQuestion: InterviewQuestion | null = null;
+          if (this.session.currentQuestionIndex < this.session.questions.length) {
+            // More questions available
+            nextQuestion = this.session.questions[this.session.currentQuestionIndex];
+          } else {
+            // No more questions - complete the interview automatically
+            console.log("DO: No more questions, completing interview");
+            await this.completeSession();
+          }
 
           return new Response(JSON.stringify({
             success: true,
             session: this.session,
-            aiResponse: aiResponseData
+            aiResponse: aiResponseData,
+            nextQuestion: nextQuestion
           }), {
             headers: { "Content-Type": "application/json" }
           });
