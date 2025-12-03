@@ -139,23 +139,60 @@ Return JSON:
     ): Promise<{ response: string; session: InterviewSession }> {
         const conversationHistory = session.aiResponses.slice(-5);
 
-        const chatPrompt = `
-You are a friendly AI interview assistant. The interview has ended.
+        // Build comprehensive context including code submissions
+        let contextDetails = `
+You are a friendly AI interview assistant helping a candidate review their completed interview.
 
-Context:
+Interview Details:
 - Job Type: ${session.jobType}
 - Interview Mode: ${session.mode}
 - Status: ${session.status}
+- Overall Score: ${session.feedback?.overallScore || 'Not yet scored'}
+
+Questions & Answers:
+`;
+
+        // Add each question, answer, and submitted code
+        session.questions.forEach((q, idx) => {
+            const answer = session.answers.find(a => a.questionId === q.questionId);
+            contextDetails += `\n${idx + 1}. ${q.title}\n`;
+            contextDetails += `   Type: ${q.type}\n`;
+
+            if (answer) {
+                if (answer.codeSubmission) {
+                    contextDetails += `   Submitted Code:\n\n${answer.codeSubmission}\n`;
+                }
+                if (answer.answerText) {
+                    contextDetails += `   Answer: ${answer.answerText}\n`;
+                }
+            } else {
+                contextDetails += `   (Not answered)\n`;
+            }
+        });
+
+        // Add feedback if available
+        if (session.feedback) {
+            contextDetails += `\n\nFeedback Summary:\n`;
+            contextDetails += `- ${session.feedback.summary}\n`;
+            if (session.feedback.strengths?.length) {
+                contextDetails += `\nStrengths: ${session.feedback.strengths.join(', ')}\n`;
+            }
+            if (session.feedback.improvementAreas?.length) {
+                contextDetails += `\nAreas for Improvement: ${session.feedback.improvementAreas.join(', ')}\n`;
+            }
+        }
+
+        const chatPrompt = `${contextDetails}
 
 Recent conversation:
 ${conversationHistory.map(r => `AI: ${r.content}`).join('\n')}
 
 User message: ${userMessage}
 
-Provide a helpful, encouraging response. Keep it concise and professional.
+Provide a helpful, specific response referencing the code and answers above when relevant. Be encouraging but honest about areas for improvement. Keep it concise and professional.
 `;
 
-        const aiResponse: any = await AI.run("@cf/meta/llama-3.3-70b-instruct-fp8-fast", {
+        const aiResponse: any = await AI.run("@cf/meta/llama-3.3-70b-instruc t-fp8-fast", {
             messages: [{ role: "user", content: chatPrompt }],
             temperature: 0.7,
             max_tokens: 500
