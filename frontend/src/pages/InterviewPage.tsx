@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useInterview } from '../contexts/InterviewContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { useVoiceInterface } from '../hooks/useVoiceInterface';
+import { useTimer } from '../features/interview/hooks/useTimer';
+import { useCodeEditor } from '../features/code-editor/hooks/useCodeEditor';
 import { aiApi } from '../services/api';
 import Editor from '@monaco-editor/react';
 import { FiSend, FiMic, FiMicOff, FiCode, FiCpu, FiClock, FiStopCircle } from 'react-icons/fi';
@@ -25,49 +27,22 @@ const InterviewPage: React.FC = () => {
     const { isDark } = useTheme();
 
     const [answerText, setAnswerText] = useState('');
-    const [codeContent, setCodeContent] = useState('');
-    const [selectedLanguage, setSelectedLanguage] = useState<ProgrammingLanguage>(ProgrammingLanguage.JAVASCRIPT);
-    const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
-    const [consoleOutput, setConsoleOutput] = useState<{ output: string; error?: string } | null>(null);
-    const [isRunning, setIsRunning] = useState(false);
-    const debounceTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
     const [hintsRevealed, setHintsRevealed] = useState(0);
-    const getLeetCodeUrl = (question: InterviewQuestion | null): string | null => {
-        if (!question) return null;
 
-        // Try to get slug from metadata
-        if (question.metadata?.leetcodeSlug) {
-            return `https://leetcode.com/problems/${question.metadata.leetcodeSlug}/`;
+    // Use custom hooks
+    const timeRemaining = useTimer(isInterviewActive);
+    const {
+        code: codeContent,
+        setCode: setCodeContent,
+        language: selectedLanguage,
+        setLanguage: setSelectedLanguage,
+        consoleOutput,
+        handleRunCode
+    } = useCodeEditor(currentQuestion, (code, lang) => {
+        if (currentSession?.sessionId) {
+            updateState({ currentCode: code, currentLanguage: lang });
         }
-
-        // Generate slug from title as fallback
-        if (question.title) {
-            const slug = question.title
-                .toLowerCase()
-                .replace(/[^a-z0-9]+/g, '-')
-                .replace(/^-|-$/g, '');
-            return `https://leetcode.com/problems/${slug}/`;
-        }
-
-        return null;
-    };
-
-    const handleRunCode = () => {
-        const leetcodeUrl = getLeetCodeUrl(currentQuestion);
-
-        if (leetcodeUrl) {
-            // Open LeetCode in new tab
-            window.open(leetcodeUrl, '_blank');
-            setConsoleOutput({
-                output: `✅ Opened LeetCode problem in new tab!\n\nYou can test your solution there and come back here to submit your answer.`
-            });
-        } else {
-            setConsoleOutput({
-                output: "",
-                error: "Could not determine LeetCode URL for this problem."
-            });
-        }
-    };
+    });
 
     // Voice Interface Integration
     const handleVoiceTranscript = useCallback((text: string) => {
@@ -110,40 +85,6 @@ const InterviewPage: React.FC = () => {
             speak(lastHistoryItem.content.content);
         }
     }, [sessionHistory, speak]);
-
-    // Simulate timer for interview
-    // Timer effect - counts down from allocated time
-    useEffect(() => {
-        // Use 45 minutes as total allocated time (not elapsed duration)
-        const totalDurationMs = 45 * 60 * 1000;
-        const startTime = new Date().getTime();
-        const endTime = startTime + totalDurationMs;
-
-        const timer = setInterval(() => {
-            const now = Date.now();
-            const remaining = Math.max(0, Math.floor((endTime - now) / 1000));
-            setTimeRemaining(remaining);
-        }, 1000);
-
-        if (!isInterviewActive) {
-            clearInterval(timer);
-            setTimeRemaining(null)
-        }
-
-        return () => {
-            clearInterval(timer);
-            setTimeRemaining(null)
-        };
-    }, [isInterviewActive]);
-
-    // Cleanup debounce timeout on unmount
-    useEffect(() => {
-        return () => {
-            if (debounceTimeoutRef.current) {
-                clearTimeout(debounceTimeoutRef.current);
-            }
-        };
-    }, []);
 
     // Reset hints when question changes
     useEffect(() => {
@@ -342,10 +283,10 @@ const InterviewPage: React.FC = () => {
                                     <button
                                         className="run-code"
                                         onClick={handleRunCode}
-                                        disabled={isRunning}
                                     >
-                                        {isRunning ? 'Running...' : 'Run Code'}
+                                        Run Code
                                     </button>
+
                                 </div>
                                 <div className="monaco-wrapper">
                                     <Editor
@@ -356,19 +297,6 @@ const InterviewPage: React.FC = () => {
                                         onChange={(value) => {
                                             const newCode = value || "";
                                             setCodeContent(newCode);
-
-                                            // Clear previous timeout
-                                            if (debounceTimeoutRef.current) {
-                                                clearTimeout(debounceTimeoutRef.current);
-                                            }
-
-                                            // Set new timeout to update backend
-                                            debounceTimeoutRef.current = setTimeout(() => {
-                                                if (currentSession?.sessionId) {
-                                                    console.log("Saving code to session state:", newCode.substring(0, 100));
-                                                    updateState({ currentCode: newCode });
-                                                }
-                                            }, 1000); // 1 second debounce
                                         }}
                                         options={{
                                             minimap: { enabled: false },
