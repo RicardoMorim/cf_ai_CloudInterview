@@ -30,7 +30,7 @@ export const errorHandler = async (c: Context, next: Next) => {
         if (error instanceof AppError) {
             return c.json(
                 standardError(error.code, error.message, error.details),
-                error.statusCode
+                error.statusCode as any
             );
         }
 
@@ -38,7 +38,7 @@ export const errorHandler = async (c: Context, next: Next) => {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
         return c.json(
             standardError('INTERNAL_ERROR', 'An unexpected error occurred', errorMessage),
-            500
+            500 as any
         );
     }
 };

@@ -77,224 +77,26 @@ export class InterviewSessionDO {
     const now = new Date().toISOString();
     let selectedQuestions: InterviewQuestion[] = [];
 
+    // Use QuestionSelector service for question selection
+    const questionSelector = new (await import("./questions/questionSelector")).QuestionSelector(this.env);
+
     if (mode === InterviewMode.TECHNICAL) {
-      try {
-        // 1. Fetch essentials list from KV
-        // const keys = await this.env.KV.list(); // unused
-
-        var essentialsData: Essentials = await this.env.KV.get("essentials", { type: "json" });
-
-        // Fallback to local data if KV is empty
-        if (!essentialsData || !essentialsData.problems) {
-          console.log("DO: KV essentials missing, using local fallback");
-          const { TECHNICAL_QUESTIONS } = await import("../data/questions");
-          essentialsData = {
-            problems: TECHNICAL_QUESTIONS.map(q => ({
-              questionId: q.questionId,
-              title: q.title,
-              difficulty: q.difficulty,
-              topics: q.tags
-            }))
-          };
-
-          // Also populate the full problem details in the fallback path
-          for (const q of TECHNICAL_QUESTIONS) {
-            await this.state.storage.put(`problem:${q.questionId}`, q);
-          }
-        }
-
-        if (essentialsData && essentialsData.problems) {
-          // 2. Filter problems
-          const candidates = essentialsData.problems.filter((p: any) => {
-            return p.difficulty && p.difficulty.toLowerCase() === difficulty.toLowerCase();
-          });
-
-          const pool = candidates.length > 0 ? candidates : essentialsData.problems;
-          const limitedPool = pool.slice(0, 50);
-
-          // 3. Ask AI to select 1-3 questions
-          let questionIds: string[] = [];
-          try {
-            const prompt = `
-You are an expert technical interviewer. 
-Job Role: ${jobType}
-${jobTitle ? `Job Title: ${jobTitle}` : ''}
-${seniority ? `Seniority Level: ${seniority}` : ''}
-Difficulty: ${difficulty}
-${jobDescription ? `Job Description Context: ${jobDescription.substring(0, 300)}...` : ''}
-
-Available LeetCode Problems (first 50):
-${limitedPool.map((p: any) => `${p.questionId}: ${p.title} (${p.topics ? p.topics.join(', ') : ''})`).join('\n')}
-
-Task: Select 1-3 appropriate coding problems for this interview.
-- Choose problems that test different aspects (e.g., arrays, strings, algorithms)
-- Variety is important - pick complementary problems
-- Return a JSON array of question IDs: ["1262", "1931", "2045"]
-- Return ONLY the JSON array, nothing else
-- RESPOND IN ENGLISH ONLY
-
-Return format example: ["1262", "1931"]
-`;
-            const response = await this.env.AI.run("@cf/meta/llama-3.3-70b-instruct-fp8-fast", {
-              messages: [{ role: "user", content: prompt }]
-            });
-
-            console.log("DO: AI Response:", JSON.stringify(response));
-
-            let responseText = "[]";
-            if (response) {
-              // Check if response.response is already an array
-              if (Array.isArray(response.response)) {
-                questionIds = response.response.slice(0, 3); // Limit to max 3
-              } else if (typeof response.response === 'string') {
-                responseText = response.response.trim();
-              } else if (typeof response === 'string') {
-                responseText = response.trim();
-              } else if (response.result && Array.isArray(response.result.response)) {
-                questionIds = response.result.response.slice(0, 3);
-              } else if (response.result && typeof response.result.response === 'string') {
-                responseText = response.result.response.trim();
-              }
-            }
-
-            // Only parse if we haven't already extracted an array
-            if (questionIds.length === 0) {
-              // Parse as array
-              const cleanResponse = responseText.replace(/```json|```/g, '').trim();
-              try {
-                questionIds = JSON.parse(cleanResponse);
-                if (!Array.isArray(questionIds)) {
-                  // Fallback: treat as single ID
-                  questionIds = [cleanResponse.replace(/['\"]/g, '')];
-                }
-                // Limit to max 3
-                questionIds = questionIds.slice(0, 3);
-              } catch (parseError) {
-                // Fallback: treat response as single ID
-                questionIds = [cleanResponse.replace(/['\"]/g, '').trim()];
-              }
-            }
-
-            console.log(`DO: AI selected question IDs:`, questionIds);
-
-          } catch (aiError) {
-            console.error("DO: AI selection failed, falling back to random:", aiError);
-            if (pool.length > 0) {
-              // Pick 1-2 random problems as fallback
-              const count = Math.min(2, pool.length);
-              for (let i = 0; i < count; i++) {
-                questionIds.push(pool[Math.floor(Math.random() * pool.length)].questionId);
-              }
-            }
-          }
-
-          // 4. Fetch full details for all selected problems
-          for (const selectedId of questionIds) {
-            if (selectedId && selectedId !== "0") {
-              if (selectedId !== "0") {
-                // 4. Fetch full details
-                var fullProblem = await this.env.KV.get(`problem:${selectedId}`, { type: "json" }) as LeetCodeProblem;
-
-                if (fullProblem) {
-                  console.log("DO: Full problem details:", fullProblem);
-
-                  // Map LeetCodeProblem to InterviewQuestion
-                  const interviewQuestion: InterviewQuestion = {
-                    questionId: fullProblem.id ? fullProblem.id.toString() : selectedId,
-                    type: QuestionType.CODING,
-                    category: fullProblem.metadata?.category || "Algorithms",
-                    difficulty: (fullProblem.difficulty as Difficulty) || difficulty,
-                    title: fullProblem.title,
-                    text: fullProblem.description || fullProblem.title,
-                    tags: fullProblem.metadata?.topics || [],
-                    estimatedTime: 30,
-                    followUpQuestions: [],
-                    hints: fullProblem.metadata?.hints || [],
-                    metadata: {
-                      difficultyWeight: 1,
-                      popularity: fullProblem.metadata?.likes || 0,
-                      lastUpdated: new Date().toISOString(),
-                      relatedQuestions: [],
-                      leetcodeSlug: fullProblem.titleSlug  // Add this line
-                    }
-                  };
-
-
-                  selectedQuestions.push(interviewQuestion);
-                }
-              }
-            }
-          }
-        }
-      } catch (error) {
-        console.error("DO: Error fetching questions:", error);
-      }
+      selectedQuestions = await questionSelector.selectTechnicalQuestions(
+        jobType,
+        difficulty,
+        jobTitle,
+        jobDescription,
+        seniority,
+        this.state.storage
+      );
     } else if (mode === InterviewMode.BEHAVIORAL) {
-      try {
-        const prompt = `
-You are an expert behavioral interviewer.
-Job Role: ${jobType}
-${jobTitle ? `Job Title: ${jobTitle}` : ''}
-${seniority ? `Seniority Level: ${seniority}` : ''}
-${jobDescription ? `Job Description Context: ${jobDescription.substring(0, 500)}...` : ''}
-
-Task: Generate a behavioral interview question tailored to this specific role and seniority.
-The question should assess soft skills relevant to the position (e.g., leadership for seniors, learning for juniors).
-
-Return ONLY the JSON object with this structure:
-{
-  "questionId": "gen_beh_${Date.now()}",
-  "title": "Short Title",
-  "text": "The full question text...",
-  "difficulty": "${difficulty}",
-  "tags": ["Tag1", "Tag2"],
-  "hints": ["Hint 1", "Hint 2"]
-}
-`;
-        const response = await this.env.AI.run("@cf/meta/llama-3.3-70b-instruct-fp8-fast", {
-          messages: [{ role: "user", content: prompt }]
-        });
-
-        let responseText = "";
-        if (response) {
-          if (typeof response.response === 'string') {
-            responseText = response.response;
-          } else if (typeof response === 'string') {
-            responseText = response;
-          } else if (response.result && typeof response.result.response === 'string') {
-            responseText = response.result.response;
-          }
-        }
-
-        const cleanResponse = responseText.replace(/```json|```/g, '').trim();
-        const questionData = JSON.parse(cleanResponse);
-
-        selectedQuestions.push({
-          questionId: questionData.questionId || `gen_beh_${Date.now()}`,
-          type: QuestionType.BEHAVIORAL,
-          category: "Behavioral",
-          difficulty: difficulty,
-          title: questionData.title || "Behavioral Question",
-          text: questionData.text || "Tell me about a time you faced a challenge.",
-          tags: questionData.tags || ["Behavioral"],
-          estimatedTime: 15,
-          followUpQuestions: [],
-          hints: questionData.hints || [],
-          metadata: {
-            difficultyWeight: 1,
-            popularity: 0,
-            lastUpdated: new Date().toISOString(),
-            relatedQuestions: []
-          }
-        });
-
-      } catch (error) {
-        console.error("DO: Failed to generate behavioral question, falling back to static:", error);
-        const { BEHAVIORAL_SCENARIOS } = await import("../data/questions");
-        if (BEHAVIORAL_SCENARIOS.length > 0) {
-          selectedQuestions.push(BEHAVIORAL_SCENARIOS[0]);
-        }
-      }
+      selectedQuestions = await questionSelector.selectBehavioralQuestions(
+        jobType,
+        difficulty,
+        jobTitle,
+        jobDescription,
+        seniority
+      );
     }
 
     this.session = {
