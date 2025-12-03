@@ -14,6 +14,7 @@ import { InterviewQuestion, ProgrammingLanguage } from '../types';
 import { useHints } from '../features/interview/hooks/useHints';
 import { useAnswerSubmission } from '../features/interview/hooks/useAnswerSubmission';
 import { InterviewHeader } from '../features/interview/components/InterviewHeader';
+import { QuestionDisplay } from '../features/interview/components/QuestionDisplay';
 
 const InterviewPage: React.FC = () => {
     const navigate = useNavigate();
@@ -152,45 +153,13 @@ const InterviewPage: React.FC = () => {
 
                 {/* Interview Content */}
                 <div className="interview-content">
-                    {/* Question Display */}
-                    <div className="question-section">
-                        <div className="question-header">
-                            <h3>Question {sessionHistory.filter(h => h.type === 'question').length}</h3>
-                            <div className="question-type">
-                                {currentQuestion?.type}
-                            </div>
-                        </div>
-                        <div className="question-content">
-                            <h4>{currentQuestion?.title || 'Interview Question'}</h4>
-                            <div
-                                className="question-text"
-                                dangerouslySetInnerHTML={{ __html: currentQuestion?.text || '' }}
-                            />
-                            {currentQuestion?.hints && currentQuestion.hints.length > 0 && (
-                                <div className="question-hints">
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                                        <h5>Hints ({hintsRevealed}/{currentQuestion.hints.length})</h5>
-                                        {hasMoreHints && (
-                                            <button
-                                                className="button secondary"
-                                                onClick={() => revealNextHint()}
-                                                style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}
-                                            >
-                                                Show Next Hint
-                                            </button>
-                                        )}
-                                    </div>
-                                    {hintsRevealed > 0 && (
-                                        <ul>
-                                            {currentQuestion.hints.slice(0, hintsRevealed).map((hint, index) => (
-                                                <li key={index}>{hint}</li>
-                                            ))}
-                                        </ul>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                    </div>
+                    <QuestionDisplay
+                        question={currentQuestion}
+                        questionNumber={sessionHistory.filter(h => h.type === 'question').length}
+                        hintsRevealed={hintsRevealed}
+                        hasMoreHints={hasMoreHints}
+                        revealNextHint={revealNextHint}
+                    />
 
                     {/* Session History */}
                     <div className="session-history">
