@@ -15,6 +15,7 @@ import { useHints } from '../features/interview/hooks/useHints';
 import { useAnswerSubmission } from '../features/interview/hooks/useAnswerSubmission';
 import { InterviewHeader } from '../features/interview/components/InterviewHeader';
 import { QuestionDisplay } from '../features/interview/components/QuestionDisplay';
+import { CodeEditor } from '../features/code-editor/components/CodeEditor';
 
 const InterviewPage: React.FC = () => {
     const navigate = useNavigate();
@@ -201,51 +202,15 @@ const InterviewPage: React.FC = () => {
 
                         {/* Code Editor (for technical questions) */}
                         {currentQuestion?.type === 'coding' && (
-                            <div className="code-editor">
-                                <div className="editor-header">
-                                    <select
-                                        value={selectedLanguage}
-                                        onChange={(e) => setSelectedLanguage(e.target.value as ProgrammingLanguage)}
-                                    >
-                                        <option value="javascript">JavaScript</option>
-                                        <option value="python">Python</option>
-                                        <option value="java">Java</option>
-                                        <option value="cpp">C++</option>
-                                        <option value="csharp">C#</option>
-                                    </select>
-                                    <button
-                                        className="run-code"
-                                        onClick={handleRunCode}
-                                    >
-                                        Run Code
-                                    </button>
-
-                                </div>
-                                <div className="monaco-wrapper">
-                                    <Editor
-                                        height="400px"
-                                        language={selectedLanguage}
-                                        theme={isDark ? "vs-dark" : "light"}
-                                        value={codeContent}
-                                        onChange={(value) => {
-                                            const newCode = value || "";
-                                            setCodeContent(newCode);
-                                        }}
-                                        options={{
-                                            minimap: { enabled: false },
-                                            fontSize: 14,
-                                            scrollBeyondLastLine: false,
-                                            automaticLayout: true
-                                        }}
-                                    />
-                                </div>
-                                {consoleOutput && (
-                                    <div className={`console-output ${consoleOutput.error ? 'error' : ''}`}>
-                                        <div className="console-header">Console Output</div>
-                                        <pre>{consoleOutput.error || consoleOutput.output}</pre>
-                                    </div>
-                                )}
-                            </div>
+                            <CodeEditor
+                                code={codeContent}
+                                language={selectedLanguage}
+                                isDark={isDark}
+                                consoleOutput={consoleOutput}
+                                onCodeChange={setCodeContent}
+                                onLanguageChange={setSelectedLanguage}
+                                onRunCode={handleRunCode}
+                            />
                         )}
 
                         {/* Action Buttons */}
