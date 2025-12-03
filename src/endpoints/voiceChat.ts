@@ -55,7 +55,7 @@ export class VoiceChat extends OpenAPIRoute {
             const currentQuestionData = await currentQuestionRes.json() as any;
             const currentQuestion = currentQuestionData.question;
 
-            console.log(currentQuestion)
+            console.log("VoiceChat: Current question data:", JSON.stringify(currentQuestion, null, 2));
 
             const voiceAgent = new VoiceAgent(AI);
             let result: { userTranscript: string; aiResponse: string; audio: ArrayBuffer };

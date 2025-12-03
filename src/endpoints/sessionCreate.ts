@@ -78,7 +78,7 @@ export class SessionCreate extends OpenAPIRoute {
 			const userId = "user_123";
 
 			console.log("SessionCreate: Creating session via Durable Object");
-
+			
 			// Create unique session ID and get Durable Object stub
 			const sessionId = crypto.randomUUID();
 			const id = SESSION_NAMESPACE.idFromName(sessionId);
@@ -88,19 +88,21 @@ export class SessionCreate extends OpenAPIRoute {
 			const sessionResponse = await stub.fetch("http://internal/start", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					userId,
-					mode,
-					jobType,
-					difficulty,
-					duration,
-					jobDescription,
-					seniority
+				body: JSON.stringify({ 
+					sessionId, // Pass the sessionId so the DO can use it
+					userId, 
+					mode, 
+					jobType, 
+					difficulty, 
+					duration, 
+					jobDescription, 
+					seniority 
 				})
 			});
-
+			
 			const { session } = await sessionResponse.json() as any;
 			console.log("SessionCreate: Session created with ID:", sessionId);
+			console.log("SessionCreate: Session object sessionId:", session?.sessionId);
 
 			// We removed the blocking AI generation here.
 			// The introduction will be handled by the voice agent or generated lazily.
@@ -108,6 +110,7 @@ export class SessionCreate extends OpenAPIRoute {
 
 			return {
 				success: true,
+				sessionId: sessionId, // Explicit sessionId at top level
 				session: session,
 				nextAction: {
 					type: "intro",

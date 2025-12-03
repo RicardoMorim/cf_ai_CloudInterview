@@ -22,11 +22,13 @@ export class InterviewSessionDO {
     this.state = state;
     this.env = env;
 
+
     // Load session data on initialization
     this.state.blockConcurrencyWhile(async () => {
+      console.log("DO Constructor: ID =", this.state.id.toString());
       console.log("DO: Loading session data...");
       await this.loadSession();
-      console.log("DO: Session data loaded");
+      console.log("DO: Session data loaded, session exists?", !!this.session);
     });
 
     // Set up automatic cleanup for expired sessions
@@ -71,6 +73,7 @@ export class InterviewSessionDO {
   // ==================
 
   async startSession(
+    sessionId: string,
     userId: string,
     mode: InterviewMode,
     jobType: string,
@@ -110,7 +113,7 @@ export class InterviewSessionDO {
     }
 
     this.session = {
-      sessionId: this.state.id.toString(),
+      sessionId: sessionId, // Use the provided sessionId, not the hashed DO ID
       userId,
       mode,
       jobType,
@@ -132,11 +135,14 @@ export class InterviewSessionDO {
       scenarioContext: undefined
     };
 
+    console.log("DO startSession: Saving session with ID:", this.session.sessionId);
     await this.saveSession();
+    console.log("DO startSession: Session saved successfully");
     return this.session;
   }
 
   async getCurrentQuestion(): Promise<InterviewQuestion | null> {
+    console.log("DO getCurrentQuestion: session exists?", !!this.session);
     if (!this.session) {
       throw new Error("No session found");
     }
@@ -267,8 +273,10 @@ export class InterviewSessionDO {
     try {
       // Handle different endpoints
       if (path === "/start" && request.method === "POST") {
+        console.log("DO /start: DO ID =", this.state.id.toString());
         const body = await request.json() as any;
         const session = await this.startSession(
+          body.sessionId, // Pass the sessionId from the request
           body.userId,
           body.mode,
           body.jobType,
@@ -278,6 +286,7 @@ export class InterviewSessionDO {
           body.jobDescription,
           body.seniority
         );
+        console.log("DO /start: Returning session with ID:", session.sessionId);
         return new Response(JSON.stringify({ success: true, session }), {
           headers: { "Content-Type": "application/json" }
         });
