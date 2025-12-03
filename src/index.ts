@@ -1,47 +1,22 @@
 import { fromHono } from "chanfana";
 import { Hono } from "hono";
+import { corsMiddleware } from "./middleware/cors";
+import { errorHandler } from "./middleware/errorHandler";
 import { SessionCreate } from "./endpoints/sessionCreate";
 import { SessionNextQuestion } from "./endpoints/sessionNextQuestion";
 import { VoiceChat } from "./endpoints/voiceChat";
 import { CodeRun } from "./endpoints/codeRun";
 
-
-
 // Start a Hono app
 const app = new Hono<{ Bindings: Env }>();
 
-// Add CORS middleware to all routes - simplified approach
+// Apply middleware
+app.use('*', corsMiddleware);
+app.use('*', errorHandler);
+
+// Log requests for debugging
 app.use('*', async (c, next) => {
-  // Always set CORS headers for every request
-  const headers = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    'Access-Control-Expose-Headers': 'X-Transcript',
-    'Access-Control-Max-Age': '86400'
-  };
-
-  // Handle preflight requests
-  if (c.req.method === 'OPTIONS') {
-    // Log preflight request for debugging
-    console.log('OPTIONS request received:', c.req.url);
-    console.log('Request headers:', c.req.header);
-
-    return new Response(null, {
-      status: 204,
-      headers: headers
-    });
-  }
-
-  // Log actual requests for debugging
   console.log(`${c.req.method} request:`, c.req.url);
-
-  // Set headers for actual requests
-  Object.entries(headers).forEach(([key, value]) => {
-    c.res.headers.set(key, value);
-  });
-
-  // Continue to the actual route handler
   await next();
 });
 
