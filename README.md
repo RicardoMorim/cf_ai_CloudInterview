@@ -2,6 +2,15 @@
 
 CloudInterview is a modern, AI-driven platform designed to help developers practice for technical and behavioral interviews. It leverages Cloudflare Workers AI to provide real-time voice interaction, coding challenges, and personalized feedback.
 
+## Demo available
+
+You can try it out at [CloudInterview](https://cf-ai-cloud-interview.vercel.app/).
+
+> Simply input the job's information, choose if its a technical or behavioral interview and start the interview!
+> The AI will start talking, and you can answer using your voice after clicking in the microphone button.
+> If its technical interviews, you'll have access to a coding editor and a run button to test and another to submit your code.
+> When you feel like the interview is over, click in the end interview button and wait for the results.
+
 ## 🚀 Features
 
 -   **AI Voice Interviewer:** Real-time voice interaction using Cloudflare Whisper (STT) and Llama 3 (LLM).
@@ -9,7 +18,6 @@ CloudInterview is a modern, AI-driven platform designed to help developers pract
     -   **Technical:** Coding problems with a built-in code editor and execution environment.
     -   **Behavioral:** STAR method practice for soft skill questions.
 -   **Real-time Feedback:** Instant analysis of your answers and code.
--   **Premium UI:** A modern, glassmorphism-inspired interface built with React and TypeScript.
 -   **Serverless Architecture:** Fully powered by Cloudflare Workers and KV for low latency and high scalability.
 
 ## 🛠️ Tech Stack
@@ -108,7 +116,6 @@ This project demonstrates:
 - [API Docs](docs/api/endpoints.md) - REST API reference
 - [Architecture](docs/architecture/overview.md) - Cloudflare stack usage
 
-**Repository:** `cf_ai_CloudInterview` ✅ (correctly prefixed)
 
 ---
 
