@@ -3,7 +3,7 @@
  * Business logic for interview session operations
  */
 
-import { InterviewSession, InterviewAnswer, AIResponse, InterviewStatus, QuestionType, Sentiment, AIResponseType } from "../../types";
+import { InterviewSession, InterviewAnswer, AIResponse, InterviewStatus, QuestionType, Sentiment, AIResponseType, InterviewMode } from "../../types";
 
 export class SessionActions {
     /**
@@ -52,23 +52,127 @@ export class SessionActions {
         session: InterviewSession,
         AI: any
     ): Promise<any> {
-        const summaryPrompt = `
-Generate a final interview summary for the candidate based on these answers:
-${JSON.stringify(session.answers.map((a: any) => ({ q: a.questionId, a: a.answerText, score: a.evaluation?.score })))}
+        // Build the full transcript
+        const transcript = SessionActions.buildTranscript(session);
 
-Return JSON:
-- overallScore: 0-100
-- summary: Executive summary of performance.
-- strengths: List of strings.
-- improvementAreas: List of strings.
-- specificRecommendations: List of strings (actionable advice).
-- recommendation: "Hire", "No Hire", "Strong Hire", "Leaning No Hire".
+        // Format transcript for AI
+        const formattedTranscript = transcript.map(entry => {
+            if (entry.type === 'question') {
+                return `[AI Question]: ${entry.content}`;
+            } else if (entry.type === 'answer') {
+                return `[Candidate Answer]: ${entry.content}`;
+            } else {
+                return `[AI Response]: ${entry.content}`;
+            }
+        }).join('\n\n');
+
+        // Build context based on interview mode
+        let contextDetails = '';
+
+        if (session.mode === InterviewMode.TECHNICAL) {
+            // For technical interviews: include LeetCode problems and code submissions
+            contextDetails = '=== TECHNICAL INTERVIEW CONTEXT ===\n\n';
+
+            // Add coding challenge details if present
+            if (session.codingChallenge) {
+                contextDetails += `Coding Challenge: ${session.codingChallenge.title}\n`;
+                contextDetails += `Difficulty: ${session.codingChallenge.difficulty}\n`;
+                contextDetails += `Topics: ${session.codingChallenge.topics.join(', ')}\n`;
+                contextDetails += `Description: ${session.codingChallenge.description}\n\n`;
+            }
+
+            // Add all questions asked
+            if (session.questions && session.questions.length > 0) {
+                contextDetails += 'Problems Asked:\n';
+                session.questions.forEach((q, idx) => {
+                    contextDetails += `${idx + 1}. ${q.title} (${q.difficulty})\n`;
+                    contextDetails += `   ${q.text}\n`;
+                    if (q.tags && q.tags.length > 0) {
+                        contextDetails += `   Tags: ${q.tags.join(', ')}\n`;
+                    }
+                });
+                contextDetails += '\n';
+            }
+
+            // Add code submissions
+            if (session.codeSubmissions && session.codeSubmissions.length > 0) {
+                contextDetails += 'Code Submissions:\n';
+                session.codeSubmissions.forEach((submission, idx) => {
+                    contextDetails += `\nSubmission ${idx + 1} (${submission.language}):\n`;
+                    contextDetails += '```\n' + submission.code + '\n```\n';
+                    if (submission.executionResult) {
+                        contextDetails += `Execution: ${submission.executionResult.success ? 'Success' : 'Failed'}\n`;
+                        if (submission.executionResult.error) {
+                            contextDetails += `Error: ${submission.executionResult.error}\n`;
+                        }
+                    }
+                });
+                contextDetails += '\n';
+            }
+        } else if (session.mode === InterviewMode.BEHAVIORAL) {
+            // For behavioral interviews: emphasize the conversation flow
+            contextDetails = '=== BEHAVIORAL INTERVIEW CONTEXT ===\n\n';
+            contextDetails += `Job Type: ${session.jobType}\n`;
+            if (session.jobDescription) {
+                contextDetails += `Job Description: ${session.jobDescription.substring(0, 300)}...\n`;
+            }
+            if (session.seniority) {
+                contextDetails += `Seniority Level: ${session.seniority}\n`;
+            }
+            contextDetails += '\n';
+        } else {
+            // Mixed mode
+            contextDetails = '=== MIXED INTERVIEW CONTEXT ===\n\n';
+        }
+
+        const summaryPrompt = `
+You are an expert technical interviewer evaluating a ${session.mode} interview.
+
+${contextDetails}
+
+=== FULL INTERVIEW TRANSCRIPT ===
+
+${formattedTranscript}
+
+---
+
+Based on the complete interview above, generate a comprehensive evaluation.
+
+${session.mode === InterviewMode.BEHAVIORAL
+                ? `For this behavioral interview, focus on:
+- Communication skills and storytelling ability
+- Use of STAR method (Situation, Task, Action, Result)
+- Depth and relevance of examples
+- Self-awareness and growth mindset
+- Leadership and collaboration skills
+- Problem-solving approach in past situations`
+                : session.mode === InterviewMode.TECHNICAL
+                    ? `For this technical interview, focus on:
+- Correctness and efficiency of solutions
+- Code quality and clarity
+- Problem-solving approach and thought process
+- Communication of technical concepts
+- Handling of hints and follow-up questions
+- Understanding of algorithms and data structures`
+                    : `For this mixed interview, evaluate both technical and behavioral aspects.`}
+
+Return JSON with this structure:
+{
+  "overallScore": <number 0-100>,
+  "summary": "<executive summary of performance>",
+  "strengths": ["<strength 1>", "<strength 2>", ...],
+  "improvementAreas": ["<area 1>", "<area 2>", ...],
+  "specificRecommendations": ["<recommendation 1>", "<recommendation 2>", ...],
+  "recommendation": "<Hire | No Hire | Strong Hire | Leaning No Hire>"
+}
+
+Be specific and reference actual examples from the transcript.
 `;
 
         const aiResponse: any = await AI.run("@cf/meta/llama-3.3-70b-instruct-fp8-fast", {
             messages: [{ role: "user", content: summaryPrompt }],
             temperature: 0.4,
-            max_tokens: 1500
+            max_tokens: 2000
         });
 
         let responseText = "";
@@ -88,9 +192,11 @@ Return JSON:
                 strengths: feedbackData.strengths || [],
                 improvementAreas: feedbackData.improvementAreas || [],
                 specificRecommendations: feedbackData.specificRecommendations || [],
+                recommendation: feedbackData.recommendation || "Pending Review",
                 generatedAt: new Date().toISOString()
             };
         } catch (error) {
+            console.error("Failed to parse feedback JSON:", error);
             return {
                 feedbackId: `fb_${Date.now()}`,
                 sessionId: session.sessionId,
@@ -99,6 +205,7 @@ Return JSON:
                 strengths: [],
                 improvementAreas: [],
                 specificRecommendations: [],
+                recommendation: "Pending Review",
                 generatedAt: new Date().toISOString()
             };
         }

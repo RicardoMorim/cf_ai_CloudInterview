@@ -52,7 +52,7 @@ const BehavioralInterviewPage: React.FC = () => {
 
     const handleEndInterview = async () => {
         await endInterview();
-        navigate('/');
+        navigate(`/interview/${currentSession?.sessionId}/results`);
     };
 
     if (!currentSession) return null;

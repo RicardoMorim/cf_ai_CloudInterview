@@ -250,21 +250,49 @@ Return format example: ["1262", "1931"]
      */
     private parseAIQuestionResponse(response: any): string[] {
         let questionIds: string[] = [];
-        let responseText = "[]";
 
-        if (response && response.response) {
-            responseText = response.response.trim();
+        // Check if response.response exists
+        if (!response || !response.response) {
+            console.warn("QuestionSelector: No response from AI");
+            return [];
         }
 
+        // Handle case where AI returns an array directly
+        if (Array.isArray(response.response)) {
+            console.log("QuestionSelector: AI returned array directly:", response.response);
+            questionIds = response.response.map((id: any) => String(id));
+            return questionIds.slice(0, 3);
+        }
+
+        // Handle case where AI returns a JSON string
+        let responseText = "";
+        if (typeof response.response === 'string') {
+            responseText = response.response.trim();
+        } else {
+            // Unexpected format, try to stringify
+            console.warn("QuestionSelector: Unexpected response format:", typeof response.response);
+            responseText = JSON.stringify(response.response);
+        }
+
+        // Try to parse as JSON
         const cleanResponse = responseText.replace(/```json|```/g, '').trim();
         try {
-            questionIds = JSON.parse(cleanResponse);
-            if (!Array.isArray(questionIds)) {
-                questionIds = [cleanResponse.replace(/['"]/g, '')];
+            const parsed = JSON.parse(cleanResponse);
+            if (Array.isArray(parsed)) {
+                questionIds = parsed.map((id: any) => String(id));
+            } else {
+                questionIds = [String(parsed)];
             }
             questionIds = questionIds.slice(0, 3);
         } catch (parseError) {
-            questionIds = [cleanResponse.replace(/['"]/g, '').trim()];
+            // Last resort: try to extract IDs from the text
+            console.warn("QuestionSelector: Failed to parse as JSON, extracting IDs from text");
+            const idMatches = cleanResponse.match(/\d+/g);
+            if (idMatches) {
+                questionIds = idMatches.slice(0, 3);
+            } else {
+                questionIds = [cleanResponse.replace(/['"]/g, '').trim()];
+            }
         }
 
         return questionIds;

@@ -33,6 +33,7 @@
     justify-content: space-between;
     align-items: center;
     padding: 1.5rem 2rem;
+    margin-top: 60px; /* Space for nav bar */
     border-bottom: 1px solid var(--border-color);
     background: rgba(10, 10, 10, 0.8);
     backdrop-filter: blur(10px);
