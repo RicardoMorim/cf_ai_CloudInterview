@@ -83,7 +83,6 @@ CloudInterview is a modern, AI-driven platform designed to help developers pract
 
  Comprehensive documentation is available in the `docs/` directory:
 
--   **[Getting Started Guide](docs/getting-started/installation.md)** - Installation and setup
 -   **[API Documentation](docs/api/endpoints.md)** - Complete API reference
 -   **[Architecture Overview](docs/architecture/overview.md)** - System design and decisions
 -   **[Documentation Index](docs/README.md)** - Full documentation navigation
@@ -105,10 +104,9 @@ This project demonstrates:
 ✅ **Memory/State:** Durable Objects + KV storage  
 
 **Quick Links:**
-- [PROMPTS.md](PROMPTS.md) - 29 documented AI prompts
+- [PROMPTS.md](PROMPTS.md) - How AI helped me in the development process
 - [API Docs](docs/api/endpoints.md) - REST API reference
 - [Architecture](docs/architecture/overview.md) - Cloudflare stack usage
-- [Getting Started](docs/getting-started/installation.md) - Run locally
 
 **Repository:** `cf_ai_CloudInterview` ✅ (correctly prefixed)
 

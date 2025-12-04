@@ -8,17 +8,17 @@ CloudInterview is a full-stack AI-powered interview platform built entirely on C
 
 ## Architecture Diagram
 
-![System Architecture](system-architecture.puml)
+![High Level Architecture](../high-level%20overview/image.png)
 
 The architecture leverages Cloudflare's edge infrastructure:
 
 **Frontend → Workers → Durable Objects → Workers AI + KV**
 
 For detailed visual representation, see:
-- [System Architecture Diagram](system-architecture.puml) - Component view
-- [Class Diagram](../class%20diagram/diagram.puml) - Code structure
-- [Domain Model](../domain%20model/domain.puml) - Data models
-- [Sequence Diagram](../sequence-diagram/sequence_diagram.puml) - Interview flow
+- [System Architecture Diagram](image.png) - Component view
+- [Class Diagram](../class%20diagram/diagram.png) - Code structure
+- [Domain Model](../domain%20model/domain.png) - Data models
+- [Sequence Diagram](../sequence-diagram/sequence_diagram.png) - Interview flow
 
 ---
 
@@ -160,11 +160,6 @@ Keys:
 2. Get full problem details by ID
 3. Cache in Durable Object storage
 
-**Data Size:**
-- Essentials: ~500KB
-- Per problem: ~10-50KB
-- Total: ~100MB
-
 ---
 
 ## Data Flow
@@ -188,15 +183,13 @@ Keys:
    ↓
 8. SessionActions processes answer
    ↓
-9. AI evaluates (optional)
+9. Move to next question
    ↓
-10. Move to next question
-    ↓
-11. Repeat 7-10 until complete
-    ↓
-12. Generate final feedback with AI
-    ↓
-13. Return feedback to user
+10. Repeat 7-9 until complete
+   ↓
+11. Generate final feedback with AI
+   ↓
+12. Return feedback to user
 ```
 
 ### Voice Interaction Flow
@@ -281,51 +274,3 @@ Keys:
 - Restrict CORS origins
 - Add request validation
 - Sanitize user inputs
-
----
-
-## Monitoring & Observability
-
-**Available Metrics:**
-- Request logs (console.log)
-- Error tracking (error handler)
-- Health check endpoint
-
-**Production Needs:**
-- Cloudflare Analytics
-- Workers Analytics Engine
-- Custom metrics for AI usage
-- Performance monitoring
-
----
-
-## Cost Optimization
-
-**Free Tier Usage:**
-- Workers: 100k requests/day
-- Workers AI: Included models
-- KV: 100k reads/day
-- Durable Objects: 1GB storage
-
-**Optimization Strategies:**
-- Cache essentials in DO storage
-- Minimize KV reads
-- Efficient AI prompts
-- Lazy load frontend assets
-
----
-
-## Future Enhancements
-
-**Planned:**
-- WebSocket support for real-time updates
-- Video recording for behavioral interviews
-- Multi-language code execution
-- Advanced analytics dashboard
-- User accounts and history
-
-**Considered:**
-- Voice synthesis (TTS) with Deepgram
-- Realtime API integration
-- Workflow orchestration for complex interviews
-- Mobile app (React Native)

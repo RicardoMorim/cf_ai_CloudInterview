@@ -13,8 +13,7 @@ Welcome to CloudInterview documentation! This page provides quick links to all d
 - **[Request/Response Examples](api/endpoints.md#sessions-api)** - Real-world usage examples
 
 ### AI Integration
-- **[Llama 3.3 Integration](../PROMPTS.md)** - How we use Workers AI
-- **[Prompt Engineering](../PROMPTS.md)** - AI prompts and strategies
+- **[AI Usage in Development](../PROMPTS.md)** - How AI helped me in the development process
 
 ---
 
@@ -34,10 +33,9 @@ Welcome to CloudInterview documentation! This page provides quick links to all d
 ## 🎯 For Cloudflare Reviewers
 
 **Quick Links:**
-1. [Getting Started](getting-started/installation.md) - Run the app locally
-2. [Architecture Overview](architecture/overview.md) - Understand Cloudflare stack usage
-3. [API Documentation](api/endpoints.md) - Explore endpoints
-4. [AI Prompts](../PROMPTS.md) - Review AI usage
+1. [Architecture Overview](architecture/overview.md) - Understand Cloudflare stack usage
+2. [API Documentation](api/endpoints.md) - Explore endpoints
+3. [AI Prompts](../PROMPTS.md) - Review AI usage
 
 **Cloudflare Technologies Used:**
 - ✅ Workers AI (Llama 3.3 70B, Whisper)
